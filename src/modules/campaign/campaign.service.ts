@@ -244,6 +244,32 @@ export class CampaignsService {
       };
     }
   }
+
+  async fetchLeadsForExecution(
+    campaignId: string,
+    status,
+  ): Promise<{ userError: { message: string } | null; data: any[] | null }> {
+    try {
+      const leads = await this.prisma.leads.findMany({
+        where: {
+          campaign_id: campaignId,
+          status: status,
+        },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+      });
+
+      return {
+        userError: null,
+        data: leads,
+      };
+    } catch (error) {
+      console.error('Failed to fetch leads for campaign:', error);
+      return {
+        userError: { message: 'Failed to fetch leads for campaign' },
+        data: null,
+      };
+    }
+  }
   async fetchCampaignById(campaignId: string): Promise<{
     userError: { message: string } | null;
     data: Campaigns | null;

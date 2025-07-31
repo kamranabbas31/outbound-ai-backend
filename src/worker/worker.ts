@@ -21,16 +21,16 @@ async function bootstrapWorker() {
       );
       const { campaignId, pacingPerSecond } = job.data;
 
-      const allLeadsResult =
-        await campaignsService.fetchLeadsForCampaign(campaignId);
+      const allLeadsResult = await campaignsService.fetchLeadsForExecution(
+        campaignId,
+        'Pending',
+      );
       if (allLeadsResult.userError || !allLeadsResult.data) {
         console.error('❌ No leads found or error fetching leads.');
         return;
       }
 
-      const pendingLeads = allLeadsResult.data.filter(
-        (lead) => lead.status === 'Pending' && lead.phone_id !== null,
-      );
+      const pendingLeads = allLeadsResult.data;
 
       if (pendingLeads.length === 0) {
         await campaignsService.updateCampaignStatus(campaignId, 'idle');
