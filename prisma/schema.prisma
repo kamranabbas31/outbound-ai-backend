@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String     @id @default(uuid())
+  username   String     @unique
+  password   String
+   email      String     @unique
+  created_at DateTime   @default(now())
+  campaigns  Campaigns[]
+}
+
+model Campaigns {
+  id               String   @id @default(uuid())
+  name             String
+  file_name        String
+  status           String
+  leads_count      Int
+  completed        Int
+  in_progress      Int
+  remaining        Int
+  failed           Int
+  duration         Float
+  cost             Float
+  created_at       DateTime @default(now())
+  execution_status String
+  user_id          String
+  user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  leads            Leads[]
+}
+
+model Leads {
+  id           String     @id @default(uuid())
+  name         String?    
+  phone_number String?    
+  phone_id     String?    
+  status       String?    
+  disposition  String?    
+  duration     Float?     
+  cost         Float?     
+  created_at   DateTime?  @default(now()) // optional but with default
+  recordingUrl String?    
+  initiated_at DateTime?  
+  campaign_id  String     // required to preserve relation
+  campaign     Campaigns  @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+}
+
+model Phone_ids {
+  id             String   @id @default(uuid())
+  phone_id       String   @unique
+  daily_usage    Int
+  last_used_date DateTime
+  is_active      Boolean
+  created_at     DateTime @default(now())
+}

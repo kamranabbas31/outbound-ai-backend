@@ -1,0 +1,18 @@
+type BillingStats {
+  totalCalls: Int!
+  totalMinutes: Float!
+  totalCost: Float!
+}
+
+type BillingStatsResponse {
+  userError: UserError
+  data: BillingStats
+}
+
+extend type Query {
+  fetchBillingData(
+    userId: String!
+    start: String!
+    end: String!
+  ): BillingStatsResponse!
+}

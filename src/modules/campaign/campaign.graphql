@@ -1,0 +1,113 @@
+type Campaign {
+  id: String!
+  name: String!
+  file_name: String
+  status: String
+  execution_status: String
+  leads_count: Int
+  completed: Int
+  in_progress: Int
+  remaining: Int
+  failed: Int
+  duration: Float
+  cost: Float
+  user_id: String
+  created_at: String
+}
+
+type Lead {
+  id: String!
+  name: String
+  phone_number: String
+  phone_id: String
+  status: String
+  disposition: String
+  duration: Float
+  cost: Float
+  recordingUrl: String
+  created_at: String
+  campaign_id: String
+  initiated: Boolean
+}
+
+input LeadInput {
+  name: String
+  phone_number: String!
+  phone_id: String
+  status: String
+  disposition: String
+  duration: Float
+  cost: Float
+  recordingUrl: String
+  initiated: Boolean
+}
+
+type CampaignResponse {
+  userError: UserError
+  data: Campaign
+}
+
+type CampaignListResponse {
+  userError: UserError
+  data: [Campaign!]
+}
+
+type LeadListResponse {
+  userError: UserError
+  data: [Lead!]
+}
+
+type UserError {
+  message: String
+}
+
+type CampaignStats {
+  completed: Int
+  inProgress: Int
+  remaining: Int
+  failed: Int
+  totalDuration: Float
+  totalCost: Float
+}
+
+type CampaignStatsResponse {
+  userError: UserError
+  data: CampaignStats
+}
+type QueueResponse {
+  userError: UserError
+  success: Boolean
+}
+type CampaignLeadPaginationResult {
+  userError: UserError
+  totalPages: Int
+  totalLeads: Int
+}
+type Query {
+  fetchCampaigns(userId: String!): CampaignListResponse!
+  fetchLeadsForCampaign(
+    campaignId: String!
+    skip: Int
+    take: Int
+    searchTerm: String
+  ): LeadListResponse!
+  fetchCampaignById(campaignId: ID!): CampaignResponse!
+  fetchCampaignStats(campaignId: ID!): CampaignStatsResponse!
+  getTotalPagesForCampaign(
+    campaignId: String!
+    itemsPerPage: Int
+  ): CampaignLeadPaginationResult!
+}
+
+type Mutation {
+  createCampaign(campaignName: String!, userId: String!): CampaignResponse!
+  addLeadsToCampaign(
+    campaignId: String!
+    leads: [LeadInput!]!
+  ): CampaignResponse!
+  enqueueCampaignJob(
+    campaignId: String!
+    pacingPerSecond: Int = 1
+  ): QueueResponse!
+  stopCampaignJob(campaignId: String!): QueueResponse!
+}

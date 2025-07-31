@@ -1,0 +1,14 @@
+input TriggerCallInput {
+  leadId: String!
+  assistantId: String
+}
+
+type TriggerCallResponse {
+  success: Boolean!
+  message: String!
+  data: JSON
+}
+
+type Mutation {
+  triggerCall(input: TriggerCallInput!): TriggerCallResponse!
+}
