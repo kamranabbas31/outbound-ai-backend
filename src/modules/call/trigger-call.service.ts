@@ -4,7 +4,7 @@ import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { TriggerCallInput } from './dto/trigger-call.dto';
-import { CTX } from 'src/types/context.type';
+import * as https from 'https';
 
 @Injectable()
 export class TriggerCallService {
@@ -45,7 +45,7 @@ export class TriggerCallService {
       assistantId: finalAssistantId,
       assistantOverrides: {
         variableValues: {
-          Name: lead.name, // changed from `lead.name`
+          Name: lead.name,
           Phone: lead.phone_number,
         },
         metadata: {
@@ -68,10 +68,14 @@ export class TriggerCallService {
       },
       phoneNumberId: lead.phone_id,
       customer: {
-        name: lead.name, // changed from `lead.name`
+        name: lead.name,
         number: lead.phone_number,
       },
     };
+
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false, // <-- Accept self-signed certs
+    });
 
     try {
       const vapiRes = await firstValueFrom(
@@ -80,6 +84,7 @@ export class TriggerCallService {
             Authorization: `Bearer ${this.VAPI_API_KEY}`,
             'Content-Type': 'application/json',
           },
+          httpsAgent, // <-- add this line
         }),
       );
 
@@ -111,7 +116,6 @@ export class TriggerCallService {
         error?.response?.data?.message || error?.message || 'VAPI Error';
 
       await this.prisma.$transaction(async (tx) => {
-        // Step 1: Mark lead as failed
         await tx.leads.update({
           where: { id: leadId },
           data: {
@@ -120,45 +124,26 @@ export class TriggerCallService {
           },
         });
 
-        // Step 2: Count campaign-level lead statuses
-        const [pending, failed, completed, inProgress, total] =
-          await Promise.all([
-            tx.leads.count({
-              where: { campaign_id: lead.campaign_id, status: 'Pending' },
-            }),
-            tx.leads.count({
-              where: { campaign_id: lead.campaign_id, status: 'Failed' },
-            }),
-            tx.leads.count({
-              where: { campaign_id: lead.campaign_id, status: 'Completed' },
-            }),
-            tx.leads.count({
-              where: { campaign_id: lead.campaign_id, status: 'InProgress' },
-            }),
-            tx.leads.count({ where: { campaign_id: lead.campaign_id } }),
-          ]);
+        const [failed, total] = await Promise.all([
+          tx.leads.count({
+            where: { campaign_id: lead.campaign_id, status: 'Failed' },
+          }),
 
-        // Step 3: Determine campaign status
-        let newStatus: 'Pending' | 'InProgress' | 'Failed' | 'Completed' =
-          'Pending';
+          tx.leads.count({ where: { campaign_id: lead.campaign_id } }),
+        ]);
+
+        let newStatus = '';
 
         if (failed === total) {
           newStatus = 'Failed';
-        } else if (completed === total) {
-          newStatus = 'Completed';
-        } else if (inProgress > 0) {
-          newStatus = 'InProgress';
-        } else if (pending === total) {
-          newStatus = 'Pending';
         }
 
-        // Step 4: Single campaign update
         await tx.campaigns.update({
           where: { id: lead.campaign_id },
           data: {
             remaining: { decrement: 1 },
             failed: { increment: 1 },
-            status: newStatus,
+            ...(newStatus === 'Failed' && { status: newStatus }),
           },
         });
       });

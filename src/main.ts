@@ -1,4 +1,5 @@
 // main.ts
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 dotenv.config(); // 👈 THIS LINE loads your .env file
