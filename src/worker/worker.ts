@@ -7,7 +7,8 @@ import { AppModule } from '../app.module';
 import { CampaignsService } from 'src/modules/campaign/campaign.service';
 import { TriggerCallService } from 'src/modules/call/trigger-call.service';
 import { redis } from 'src/utils/redis';
-
+import * as dotenv from 'dotenv';
+dotenv.config();
 async function bootstrapWorker() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const campaignsService = app.get(CampaignsService);
