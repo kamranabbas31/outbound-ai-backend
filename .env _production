@@ -1,0 +1,18 @@
+DATABASE_URL="postgresql://postgres:Y8_q2byqHbEsB8b@outbount-db-instance.cipeiwk8c2vh.us-east-1.rds.amazonaws.com:5432/outbound_ai?schema=public"
+
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+
+# Redis configuration
+REDIS_HOST=quiet-koala-10536.upstash.io
+REDIS_PORT=6379
+REDIS_PASSWORD=ASkoAAIjcDE4YjZhZTk5MDllMTk0NGYwODYxNjBmZTJlZGM5MTAyYXAxMA
+REDIS_URL=rediss://default:ASkoAAIjcDE4YjZhZTk5MDllMTk0NGYwODYxNjBmZTJlZGM5MTAyYXAxMA@quiet-koala-10536.upstash.io:6379
+
+# Vapi Configuration
+VAPI_API_KEY= 
+VAPI_API_URL = 'https://api.vapi.ai/call/phone'
+ defaultAssistantId = '48b1e44a-c1ff-4f4e-a9e0-7b1e03f197ea'
