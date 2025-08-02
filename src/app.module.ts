@@ -11,9 +11,13 @@ import { CampaignModule } from './modules/campaign/campaign.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { PhoneIdsModule } from './modules/phone_ids/phone_ids.module';
 import { NotificationsGateway } from './modules/socket/notifications.gateway';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       typePaths: ['./**/*.graphql'],
