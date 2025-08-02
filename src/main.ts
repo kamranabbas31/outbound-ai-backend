@@ -23,7 +23,7 @@ async function bootstrap() {
     origin: '*',
     credentials: true,
   });
-
+  console.log('Using DB:', process.env.DATABASE_URL);
   // Start the server
   await app.listen(4000);
   console.log('[NestJS] Server is running on http://localhost:4000');
