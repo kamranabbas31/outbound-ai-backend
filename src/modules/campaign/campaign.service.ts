@@ -8,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Campaigns } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { redis } from 'src/utils/redis';
+import { UpdateCampaignInput } from './dto/update-campaign.input';
+import { ActivityType } from 'src/graphql';
 
 @Injectable()
 export class CampaignsService {
@@ -89,8 +91,19 @@ export class CampaignsService {
       const campaigns = await this.prisma.campaigns.findMany({
         where: { user_id: userId },
         orderBy: { created_at: 'desc' },
+        include: {
+          cadence_template: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          cadence_progress: {
+            orderBy: { executed_at: 'desc' },
+            take: 1, // ✅ Only the latest progress
+          },
+        },
       });
-
       return {
         userError: null,
         data: campaigns,
@@ -107,6 +120,8 @@ export class CampaignsService {
   async addLeadsToCampaign(
     campaignId: string,
     leads: any[],
+    cadenceId?: string,
+    cadenceStartDate?: Date,
   ): Promise<{
     userError: { message: string } | null;
     data: Campaigns | null;
@@ -151,7 +166,6 @@ export class CampaignsService {
         this.prisma.leads.count({ where: { campaign_id: campaignId } }),
       ]);
 
-      // Determine campaign status
       let newStatus: 'Pending' | 'Failed' | 'Completed' | 'InProgress' =
         'Pending';
 
@@ -165,14 +179,24 @@ export class CampaignsService {
         newStatus = 'Pending';
       }
 
+      const updateData: any = {
+        leads_count: totalCount,
+        remaining: pendingCount,
+        failed: failedCount,
+        status: newStatus,
+      };
+
+      // ✅ Attach cadence if provided
+      if (cadenceId && cadenceId !== 'none') {
+        updateData.cadence_template_id = cadenceId;
+        updateData.cadence_start_date = cadenceStartDate ?? new Date();
+        updateData.cadence_stopped = false;
+        updateData.cadence_completed = false;
+      }
+
       const updatedCampaign = await this.prisma.campaigns.update({
         where: { id: campaignId },
-        data: {
-          leads_count: totalCount,
-          remaining: pendingCount,
-          failed: failedCount,
-          status: newStatus,
-        },
+        data: updateData,
       });
 
       return {
@@ -200,31 +224,31 @@ export class CampaignsService {
           campaign_id: campaignId,
           OR: searchTerm
             ? [
-                {
-                  name: {
-                    contains: searchTerm,
-                    mode: 'insensitive',
-                  },
+              {
+                name: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
                 },
-                {
-                  phone_number: {
-                    contains: searchTerm,
-                    mode: 'insensitive',
-                  },
+              },
+              {
+                phone_number: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
                 },
-                {
-                  status: {
-                    contains: searchTerm,
-                    mode: 'insensitive',
-                  },
+              },
+              {
+                status: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
                 },
-                {
-                  disposition: {
-                    contains: searchTerm,
-                    mode: 'insensitive',
-                  },
+              },
+              {
+                disposition: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
                 },
-              ]
+              },
+            ]
             : undefined,
         },
         orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
@@ -277,6 +301,14 @@ export class CampaignsService {
     try {
       const campaign = await this.prisma.campaigns.findUnique({
         where: { id: campaignId },
+        include: {
+          cadence_template: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!campaign) {
@@ -398,4 +430,185 @@ export class CampaignsService {
       totalLeads,
     };
   }
+
+  async attachCadenceToCampaign(input: {
+    campaignId: string;
+    cadenceId: string;
+    startDate?: Date;
+  }) {
+    const { campaignId, cadenceId, startDate } = input;
+
+    try {
+      const campaign = await this.prisma.campaigns.findUnique({
+        where: { id: campaignId },
+      });
+
+      if (!campaign) {
+        return {
+          success: false,
+          userError: { message: 'Campaign not found' },
+        };
+      }
+
+      const cadence = await this.prisma.cadenceTemplate.findUnique({
+        where: { id: cadenceId },
+      });
+
+      if (!cadence) {
+        return {
+          success: false,
+          userError: { message: 'Cadence template not found' },
+        };
+      }
+
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          cadence_template_id: cadenceId,
+          cadence_start_date: startDate,
+          cadence_stopped: false,
+          cadence_completed: false,
+        },
+      });
+
+      return {
+        success: true,
+        userError: null,
+      };
+    } catch (error) {
+      console.error('[AttachCadenceToCampaign] Unexpected error:', error);
+      return {
+        success: false,
+        userError: {
+          message: 'Internal server error. Please try again later.',
+        },
+      };
+    }
+  }
+
+  async stopCadence(campaignId: string) {
+    try {
+      const campaign = await this.prisma.campaigns.findUnique({
+        where: { id: campaignId },
+      });
+
+      if (!campaign) {
+        return {
+          success: false,
+          userError: { message: 'Campaign not found' },
+        };
+      }
+
+      if (!campaign.cadence_template_id) {
+        return {
+          success: false,
+          userError: { message: 'This campaign has no cadence attached' },
+        };
+      }
+
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          cadence_stopped: true,
+        },
+      });
+
+      return {
+        success: true,
+        userError: null,
+      };
+    } catch (error) {
+      console.error('[StopCadence] Error:', error);
+      return {
+        success: false,
+        userError: {
+          message: 'Internal server error. Please try again later.',
+        },
+      };
+    }
+  }
+
+  async updateCampaign(input: UpdateCampaignInput) {
+    const { id, ...updateData } = input;
+
+    try {
+      const updatedCampaign = await this.prisma.campaigns.update({
+        where: { id },
+        data: updateData,
+        include: {
+          cadence_template: {
+            select: { id: true, name: true },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        userError: null,
+        campaign: updatedCampaign,
+      };
+    } catch (error) {
+      console.error('[updateCampaign] Error:', error);
+      return {
+        success: false,
+        userError: { message: 'Failed to update campaign' },
+        campaign: null,
+      };
+    }
+  }
+
+  async fetchLeadAttempts(campaignId: string) {
+    try {
+      // Fetch leads + their call attempts
+      const leads = await this.prisma.leads.findMany({
+        where: { campaign_id: campaignId },
+        include: {
+          activity_logs: {
+            where: { activity_type: ActivityType.CALL_ATTEMPT },
+            orderBy: { created_at: "asc" }
+          }
+        }
+      });
+
+      // Flatten into one row per attempt or one row if no attempts
+      const rows = leads.flatMap((lead) => {
+        if (lead.activity_logs.length === 0) {
+          // No activity logs, return a single row with lead data and attempt 0
+          return [{
+            name: lead.name || "",
+            phone: lead.phone_number || "",
+            status: lead.status || "",
+            disposition: lead.disposition || "",
+            duration: "0 sec",
+            cost: lead.cost ?? 0.0,
+            attempt: 0
+          }];
+        }
+
+        // Otherwise return rows for each activity log
+        return lead.activity_logs.map((log, index) => ({
+          name: lead.name || "",
+          phone: lead.phone_number || "",
+          status: log.lead_status || "",
+          disposition: log.to_disposition || "",
+          duration: log.duration ? `${log.duration} sec` : "0 sec",
+          cost: log.cost ?? 0.0,
+          attempt: index + 1
+        }));
+      });
+
+      console.log({ rows });
+      return {
+        userError: null,
+        data: rows
+      };
+    } catch (error) {
+      console.error("Error fetching lead attempts:", error);
+      return {
+        userError: { message: "Failed to fetch lead attempts" },
+        data: []
+      };
+    }
+  }
+
 }

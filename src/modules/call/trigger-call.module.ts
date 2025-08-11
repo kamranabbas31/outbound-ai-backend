@@ -9,5 +9,6 @@ import { TriggerCallResolver } from './trigger-call.resolver';
 @Module({
   imports: [PrismaModule, HttpModule],
   providers: [TriggerCallService, TriggerCallResolver],
+  exports: [TriggerCallService],
 })
 export class TriggerCallModule {}

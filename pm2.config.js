@@ -8,5 +8,9 @@ module.exports = {
       name: 'bullmq-worker',
       script: 'dist/worker/worker.js',
     },
+    {
+      name: 'bullmq-worker',
+      script: 'dist/worker/cadence.worker.js',
+    },
   ],
 };

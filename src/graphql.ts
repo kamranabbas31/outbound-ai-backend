@@ -8,6 +8,20 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export enum ActivityType {
+    CALL_ATTEMPT = "CALL_ATTEMPT",
+    DISPOSITION_TRANSITION = "DISPOSITION_TRANSITION",
+    CADENCE_EXECUTION = "CADENCE_EXECUTION",
+    NOTE_ADDED = "NOTE_ADDED",
+    STATUS_UPDATE = "STATUS_UPDATE"
+}
+
+export interface LeadActivityLogFilterInput {
+    lead_id?: Nullable<string>;
+    campaign_id?: Nullable<string>;
+    activity_type?: Nullable<ActivityType>;
+}
+
 export interface RegisterInput {
     username: string;
     email: string;
@@ -17,6 +31,22 @@ export interface RegisterInput {
 export interface LoginInput {
     username: string;
     password: string;
+}
+
+export interface CadenceDayInput {
+    attempts: number;
+    time_windows: string[];
+}
+
+export interface CadenceDaysInput {
+    day: string;
+    config: CadenceDayInput;
+}
+
+export interface CreateCadenceTemplateInput {
+    name: string;
+    retry_dispositions: string[];
+    cadence_days: CadenceDaysInput[];
 }
 
 export interface TriggerCallInput {
@@ -36,10 +66,72 @@ export interface LeadInput {
     initiated?: Nullable<boolean>;
 }
 
+export interface AttachCadenceInput {
+    campaignId: string;
+    cadenceId: string;
+    startDate?: Nullable<DateTime>;
+}
+
+export interface UpdateCampaignInput {
+    id: string;
+    name?: Nullable<string>;
+    file_name?: Nullable<string>;
+    status?: Nullable<string>;
+    leads_count?: Nullable<number>;
+    completed?: Nullable<number>;
+    in_progress?: Nullable<number>;
+    remaining?: Nullable<number>;
+    failed?: Nullable<number>;
+    duration?: Nullable<number>;
+    cost?: Nullable<number>;
+    execution_status?: Nullable<string>;
+    cadence_template_id?: Nullable<string>;
+    cadence_start_date?: Nullable<DateTime>;
+    cadence_stopped?: Nullable<boolean>;
+    cadence_completed?: Nullable<boolean>;
+}
+
 export interface CreateUserInput {
     username: string;
     email: string;
     password: string;
+}
+
+export interface LeadActivityLog {
+    id: string;
+    lead_id: string;
+    campaign_id: string;
+    activity_type: ActivityType;
+    from_disposition?: Nullable<string>;
+    to_disposition?: Nullable<string>;
+    disposition_at?: Nullable<string>;
+    duration?: Nullable<number>;
+    cost?: Nullable<number>;
+    created_at: string;
+}
+
+export interface LeadActivityLogResponse {
+    userError?: Nullable<UserError>;
+    data?: Nullable<LeadActivityLog[]>;
+}
+
+export interface UserError {
+    message: string;
+}
+
+export interface IQuery {
+    leadActivityLogs(filter: LeadActivityLogFilterInput): LeadActivityLogResponse | Promise<LeadActivityLogResponse>;
+    fetchBillingData(userId: string, start: string, end: string): BillingStatsResponse | Promise<BillingStatsResponse>;
+    cadenceTemplates(): CadenceTemplatesResponse | Promise<CadenceTemplatesResponse>;
+    fetchCampaigns(userId: string): CampaignListResponse | Promise<CampaignListResponse>;
+    fetchLeadsForCampaign(campaignId: string, skip?: Nullable<number>, take?: Nullable<number>, searchTerm?: Nullable<string>): LeadListResponse | Promise<LeadListResponse>;
+    fetchCampaignById(campaignId: string): CampaignResponse | Promise<CampaignResponse>;
+    fetchCampaignStats(campaignId: string): CampaignStatsResponse | Promise<CampaignStatsResponse>;
+    getTotalPagesForCampaign(campaignId: string, itemsPerPage?: Nullable<number>): CampaignLeadPaginationResult | Promise<CampaignLeadPaginationResult>;
+    fetchLeadAttempts(campaignId: string): LeadAttemptListResponse | Promise<LeadAttemptListResponse>;
+    fetchDashboardStats(userId: string, startDate?: Nullable<string>, endDate?: Nullable<string>): DashboardStatsResponse | Promise<DashboardStatsResponse>;
+    getMultipleAvailablePhoneIds(count: number): string[] | Promise<string[]>;
+    getUser(id: string): Nullable<User> | Promise<Nullable<User>>;
 }
 
 export interface AuthPayload {
@@ -66,11 +158,16 @@ export interface IMutation {
     register(data: RegisterInput): RegisterResponse | Promise<RegisterResponse>;
     login(data: LoginInput): LoginPayload | Promise<LoginPayload>;
     refresh(): AuthPayload | Promise<AuthPayload>;
+    createCadenceTemplate(input: CreateCadenceTemplateInput): CreateCadenceTemplateResponse | Promise<CreateCadenceTemplateResponse>;
+    deleteCadenceTemplate(id: string): DeleteCadenceTemplateResponse | Promise<DeleteCadenceTemplateResponse>;
     triggerCall(input: TriggerCallInput): TriggerCallResponse | Promise<TriggerCallResponse>;
     createCampaign(campaignName: string, userId: string): CampaignResponse | Promise<CampaignResponse>;
-    addLeadsToCampaign(campaignId: string, leads: LeadInput[]): CampaignResponse | Promise<CampaignResponse>;
+    addLeadsToCampaign(campaignId: string, leads: LeadInput[], cadenceId?: Nullable<string>, cadenceStartDate?: Nullable<DateTime>): CampaignResponse | Promise<CampaignResponse>;
     enqueueCampaignJob(campaignId: string, pacingPerSecond?: Nullable<number>): QueueResponse | Promise<QueueResponse>;
     stopCampaignJob(campaignId: string): QueueResponse | Promise<QueueResponse>;
+    attachCadenceToCampaign(input: AttachCadenceInput): CadenceAttachResponse | Promise<CadenceAttachResponse>;
+    stopCadence(campaignId: string): CadenceAttachResponse | Promise<CadenceAttachResponse>;
+    updateCampaign(input: UpdateCampaignInput): UpdateCampaignResponse | Promise<UpdateCampaignResponse>;
     createUser(data: CreateUserInput): User | Promise<User>;
 }
 
@@ -83,23 +180,6 @@ export interface BillingStats {
 export interface BillingStatsResponse {
     userError?: Nullable<UserError>;
     data?: Nullable<BillingStats>;
-}
-
-export interface IQuery {
-    fetchBillingData(userId: string, start: string, end: string): BillingStatsResponse | Promise<BillingStatsResponse>;
-    fetchCampaigns(userId: string): CampaignListResponse | Promise<CampaignListResponse>;
-    fetchLeadsForCampaign(campaignId: string, skip?: Nullable<number>, take?: Nullable<number>, searchTerm?: Nullable<string>): LeadListResponse | Promise<LeadListResponse>;
-    fetchCampaignById(campaignId: string): CampaignResponse | Promise<CampaignResponse>;
-    fetchCampaignStats(campaignId: string): CampaignStatsResponse | Promise<CampaignStatsResponse>;
-    getTotalPagesForCampaign(campaignId: string, itemsPerPage?: Nullable<number>): CampaignLeadPaginationResult | Promise<CampaignLeadPaginationResult>;
-    getMultipleAvailablePhoneIds(count: number): string[] | Promise<string[]>;
-    getUser(id: string): Nullable<User> | Promise<Nullable<User>>;
-}
-
-export interface TriggerCallResponse {
-    success: boolean;
-    message: string;
-    data?: Nullable<JSON>;
 }
 
 export interface Campaign {
@@ -117,6 +197,49 @@ export interface Campaign {
     cost?: Nullable<number>;
     user_id?: Nullable<string>;
     created_at?: Nullable<string>;
+    cadence_template?: Nullable<CadenceTemplate>;
+    cadence_template_id?: Nullable<string>;
+    cadence_start_date?: Nullable<DateTime>;
+    cadence_stopped?: Nullable<boolean>;
+    cadence_completed?: Nullable<boolean>;
+    cadence_progress: CadenceProgress[];
+}
+
+export interface CadenceTemplate {
+    id: string;
+    name: string;
+    retry_dispositions: string[];
+    cadence_days: JSON;
+    created_at: DateTime;
+    campaigns: Campaign[];
+}
+
+export interface CreateCadenceTemplateResponse {
+    userError?: Nullable<UserError>;
+    template?: Nullable<CadenceTemplate>;
+}
+
+export interface CadenceTemplatesResponse {
+    userError?: Nullable<UserError>;
+    templates?: Nullable<CadenceTemplate[]>;
+}
+
+export interface DeleteCadenceTemplateResponse {
+    userError?: Nullable<UserError>;
+    success: boolean;
+}
+
+export interface TriggerCallResponse {
+    success: boolean;
+    message: string;
+    data?: Nullable<JSON>;
+}
+
+export interface CadenceProgress {
+    id: string;
+    day: number;
+    attempt: number;
+    executed_at: string;
 }
 
 export interface Lead {
@@ -131,7 +254,7 @@ export interface Lead {
     recordingUrl?: Nullable<string>;
     created_at?: Nullable<string>;
     campaign_id?: Nullable<string>;
-    initiated?: Nullable<boolean>;
+    initiated_at?: Nullable<string>;
 }
 
 export interface CampaignResponse {
@@ -147,10 +270,6 @@ export interface CampaignListResponse {
 export interface LeadListResponse {
     userError?: Nullable<UserError>;
     data?: Nullable<Lead[]>;
-}
-
-export interface UserError {
-    message?: Nullable<string>;
 }
 
 export interface CampaignStats {
@@ -178,5 +297,46 @@ export interface CampaignLeadPaginationResult {
     totalLeads?: Nullable<number>;
 }
 
+export interface CadenceAttachResponse {
+    success?: Nullable<boolean>;
+    userError?: Nullable<UserError>;
+}
+
+export interface UpdateCampaignResponse {
+    success: boolean;
+    userError?: Nullable<UserError>;
+    campaign?: Nullable<Campaign>;
+}
+
+export interface LeadAttempt {
+    name?: Nullable<string>;
+    phone?: Nullable<string>;
+    status?: Nullable<string>;
+    disposition?: Nullable<string>;
+    duration?: Nullable<string>;
+    cost?: Nullable<number>;
+    attempt?: Nullable<number>;
+}
+
+export interface LeadAttemptListResponse {
+    userError?: Nullable<UserError>;
+    data?: Nullable<LeadAttempt[]>;
+}
+
+export interface DashboardStats {
+    completed: number;
+    inProgress: number;
+    remaining: number;
+    failed: number;
+    totalDuration: number;
+    totalCost: number;
+}
+
+export interface DashboardStatsResponse {
+    userError?: Nullable<UserError>;
+    data?: Nullable<DashboardStats>;
+}
+
 export type JSON = any;
+export type DateTime = any;
 type Nullable<T> = T | null;

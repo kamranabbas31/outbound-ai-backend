@@ -1,0 +1,22 @@
+type DashboardStats {
+  completed: Int!
+  inProgress: Int!
+  remaining: Int!
+  failed: Int!
+  totalDuration: Float!
+  totalCost: Float!
+}
+
+type DashboardStatsResponse {
+  userError: UserError
+  data: DashboardStats
+}
+
+type Query {
+  # Fetch aggregated campaign stats for all campaigns of a user
+  fetchDashboardStats(
+    userId: String!
+    startDate: String
+    endDate: String
+  ): DashboardStatsResponse!
+}

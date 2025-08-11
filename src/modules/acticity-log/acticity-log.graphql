@@ -1,0 +1,39 @@
+enum ActivityType {
+  CALL_ATTEMPT
+  DISPOSITION_TRANSITION
+  CADENCE_EXECUTION
+  NOTE_ADDED
+  STATUS_UPDATE
+}
+
+type LeadActivityLog {
+  id: ID!
+  lead_id: String!
+  campaign_id: String!
+  activity_type: ActivityType!
+  from_disposition: String
+  to_disposition: String
+  disposition_at: String
+  duration: Float
+  cost: Float
+  created_at: String!
+}
+
+input LeadActivityLogFilterInput {
+  lead_id: String
+  campaign_id: String
+  activity_type: ActivityType
+}
+type LeadActivityLogResponse {
+  userError: UserError
+  data: [LeadActivityLog!]
+}
+
+type UserError {
+  message: String!
+}
+type Query {
+  leadActivityLogs(
+    filter: LeadActivityLogFilterInput!
+  ): LeadActivityLogResponse!
+}

@@ -1,0 +1,62 @@
+scalar JSON
+scalar DateTime
+
+type Campaign {
+  id: String!
+  name: String!
+}
+
+type CadenceTemplate {
+  id: String!
+  name: String!
+  retry_dispositions: [String!]!
+  cadence_days: JSON!
+  created_at: DateTime!
+  campaigns: [Campaign!]!
+}
+
+input CadenceDayInput {
+  attempts: Int!
+  time_windows: [String!]!
+}
+
+input CadenceDaysInput {
+  day: String!
+  config: CadenceDayInput!
+}
+
+input CreateCadenceTemplateInput {
+  name: String!
+  retry_dispositions: [String!]!
+  cadence_days: [CadenceDaysInput!]!
+}
+
+type UserError {
+  message: String
+}
+
+type CreateCadenceTemplateResponse {
+  userError: UserError
+  template: CadenceTemplate
+}
+
+type CadenceTemplatesResponse {
+  userError: UserError
+  templates: [CadenceTemplate!]
+}
+
+type DeleteCadenceTemplateResponse {
+  userError: UserError
+  success: Boolean!
+}
+
+type Query {
+  cadenceTemplates: CadenceTemplatesResponse!
+}
+
+type Mutation {
+  createCadenceTemplate(
+    input: CreateCadenceTemplateInput!
+  ): CreateCadenceTemplateResponse!
+  deleteCadenceTemplate(id: String!): DeleteCadenceTemplateResponse!
+}

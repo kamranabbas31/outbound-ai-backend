@@ -12,7 +12,7 @@ import {
 
 @Injectable()
 export class WebhookService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async processWebhook(rawBody: string): Promise<void> {
     let payload: any;
@@ -83,7 +83,17 @@ export class WebhookService {
           ...(recordingUrl && { recording_url: recordingUrl }),
         },
       });
-      console.log('✅ Lead updated:', leadId);
+      await tx.leadActivityLog.create({
+        data: {
+          lead_id: leadId,
+          campaign_id: campaignId,
+          activity_type: 'CALL_ATTEMPT',
+          lead_status: status,
+          to_disposition: disposition,
+          duration: durationMinutes,
+          cost,
+        },
+      });
 
       // 2. Prepare campaign update fields
       const campaignUpdate: any = {

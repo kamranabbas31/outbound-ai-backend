@@ -1,3 +1,10 @@
+type CadenceProgress {
+  id: String!
+  day: Int!
+  attempt: Int!
+  executed_at: String!
+}
+
 type Campaign {
   id: String!
   name: String!
@@ -13,6 +20,12 @@ type Campaign {
   cost: Float
   user_id: String
   created_at: String
+  cadence_template: CadenceTemplate
+  cadence_template_id: String
+  cadence_start_date: DateTime
+  cadence_stopped: Boolean
+  cadence_completed: Boolean
+  cadence_progress: [CadenceProgress!]!
 }
 
 type Lead {
@@ -27,7 +40,7 @@ type Lead {
   recordingUrl: String
   created_at: String
   campaign_id: String
-  initiated: Boolean
+  initiated_at: String
 }
 
 input LeadInput {
@@ -40,6 +53,12 @@ input LeadInput {
   cost: Float
   recordingUrl: String
   initiated: Boolean
+}
+
+input AttachCadenceInput {
+  campaignId: String!
+  cadenceId: String!
+  startDate: DateTime
 }
 
 type CampaignResponse {
@@ -83,6 +102,52 @@ type CampaignLeadPaginationResult {
   totalPages: Int
   totalLeads: Int
 }
+
+type CadenceAttachResponse {
+  success: Boolean
+  userError: UserError
+}
+
+input UpdateCampaignInput {
+  id: String!
+  name: String
+  file_name: String
+  status: String
+  leads_count: Int
+  completed: Int
+  in_progress: Int
+  remaining: Int
+  failed: Int
+  duration: Float
+  cost: Float
+  execution_status: String
+  cadence_template_id: String
+  cadence_start_date: DateTime
+  cadence_stopped: Boolean
+  cadence_completed: Boolean
+}
+
+type UpdateCampaignResponse {
+  success: Boolean!
+  userError: UserError
+  campaign: Campaign
+}
+
+type LeadAttempt {
+  name: String
+  phone: String
+  status: String
+  disposition: String
+  duration: String
+  cost: Float
+  attempt: Int
+}
+
+type LeadAttemptListResponse {
+  userError: UserError
+  data: [LeadAttempt!]
+}
+
 type Query {
   fetchCampaigns(userId: String!): CampaignListResponse!
   fetchLeadsForCampaign(
@@ -97,6 +162,8 @@ type Query {
     campaignId: String!
     itemsPerPage: Int
   ): CampaignLeadPaginationResult!
+  fetchLeadAttempts(campaignId: String!): LeadAttemptListResponse!
+
 }
 
 type Mutation {
@@ -104,10 +171,15 @@ type Mutation {
   addLeadsToCampaign(
     campaignId: String!
     leads: [LeadInput!]!
+    cadenceId: String
+    cadenceStartDate: DateTime
   ): CampaignResponse!
   enqueueCampaignJob(
     campaignId: String!
     pacingPerSecond: Int = 1
   ): QueueResponse!
   stopCampaignJob(campaignId: String!): QueueResponse!
+  attachCadenceToCampaign(input: AttachCadenceInput!): CadenceAttachResponse!
+  stopCadence(campaignId: String!): CadenceAttachResponse!
+  updateCampaign(input: UpdateCampaignInput!): UpdateCampaignResponse!
 }

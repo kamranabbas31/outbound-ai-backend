@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ActivityType {
+  CALL_ATTEMPT
+  DISPOSITION_CHANGE
+  CADENCE_EXECUTION
+  NOTE_ADDED
+  STATUS_UPDATE
+}
+
 model User {
   id         String     @id @default(uuid())
   username   String     @unique
@@ -17,45 +25,103 @@ model User {
 }
 
 model Campaigns {
-  id               String   @id @default(uuid())
-  name             String
-  file_name        String
-  status           String
-  leads_count      Int
-  completed        Int
-  in_progress      Int
-  remaining        Int
-  failed           Int
-  duration         Float
-  cost             Float
-  created_at       DateTime @default(now())
-  execution_status String
-  user_id          String
-  user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  leads            Leads[]
+  id                  String             @id @default(uuid())
+  name                String
+  file_name           String
+  status              String
+  leads_count         Int
+  completed           Int
+  in_progress         Int
+  remaining           Int
+  failed              Int
+  duration            Float
+  cost                Float
+  created_at          DateTime           @default(now())
+  execution_status    String
+  user_id             String
+  user                User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  leads               Leads[]
+  cadence_template_id String?
+  cadence_template    CadenceTemplate?   @relation(fields: [cadence_template_id], references: [id])
+  cadence_progress    CadenceProgress[]
+  cadence_start_date  DateTime?
+  cadence_stopped     Boolean            @default(false)
+  cadence_completed   Boolean            @default(false)
+  activity_logs       LeadActivityLog[]  @relation("LeadActivityLogsForCampaign") // ✅ Unique relation name
 }
 
+
 model Leads {
-  id           String     @id @default(uuid())
-  name         String?    
-  phone_number String?    
-  phone_id     String?    
-  status       String?    
-  disposition  String?    
-  duration     Float?     
-  cost         Float?     
-  created_at   DateTime?  @default(now()) // optional but with default
-  recordingUrl String?    
-  initiated_at DateTime?  
-  campaign_id  String     // required to preserve relation
-  campaign     Campaigns  @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  id                String             @id @default(uuid())
+  name              String?
+  phone_number      String?
+  phone_id          String?
+  status            String?
+  disposition       String?
+  duration          Float?
+  cost              Float?
+  created_at        DateTime?          @default(now())
+  recordingUrl      String?
+  initiated_at      DateTime?
+  campaign_id       String
+  campaign          Campaigns          @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  cadence_progress  CadenceProgress[]
+  activity_logs     LeadActivityLog[]  @relation("LeadActivityLogsForLead") // ✅ Unique relation name
 }
 
 model Phone_ids {
-  id             String   @id @default(uuid())
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   phone_id       String   @unique
-  daily_usage    Int
-  last_used_date DateTime
-  is_active      Boolean
+  daily_usage    Int      @default(0)
+  last_used_date DateTime? @db.Timestamp(6)
+  is_active      Boolean  @default(true)
   created_at     DateTime @default(now())
+}
+
+
+model CadenceTemplate {
+  id                 String     @id @default(uuid())
+  name               String
+  retry_dispositions String[]  // Retryable dispositions like "No Answer", etc.
+  cadence_days       Json      // Example: { "1": { "attempts": 2, "time_windows": ["10:00–12:00"] }, ... }
+  created_at         DateTime  @default(now())
+  campaigns          Campaigns[]
+  cadence_progress   CadenceProgress[]
+}
+
+model CadenceProgress {
+  id            String          @id @default(uuid())
+  lead_id       String?
+  campaign_id   String?
+  cadence_id    String?
+  day           Int
+  attempt       Int
+  executed_at   DateTime        @default(now())
+  time_window   String
+
+  lead          Leads?           @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  campaign      Campaigns?       @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  cadence       CadenceTemplate? @relation(fields: [cadence_id], references: [id], onDelete: Cascade)
+}
+
+model LeadActivityLog {
+  id               String       @id @default(uuid())
+  lead_id          String
+  campaign_id      String
+  activity_type    ActivityType
+  created_at       DateTime     @default(now())
+
+  from_disposition String?      // Previous disposition (if applicable)
+  to_disposition   String?      // New disposition
+  disposition_at   DateTime?    // When disposition changed
+
+  duration         Int?         // In seconds (if needed)
+  cost             Float?       // In USD (if needed)
+
+  lead_status            String?      // Optional note/description
+
+  lead             Leads        @relation("LeadActivityLogsForLead", fields: [lead_id], references: [id], onDelete: Cascade)
+  campaign         Campaigns    @relation("LeadActivityLogsForCampaign", fields: [campaign_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id, campaign_id])
 }

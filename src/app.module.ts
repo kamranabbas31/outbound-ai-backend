@@ -12,9 +12,14 @@ import { BillingModule } from './modules/billing/billing.module';
 import { PhoneIdsModule } from './modules/phone_ids/phone_ids.module';
 import { NotificationsGateway } from './modules/socket/notifications.gateway';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CadenceModule } from './modules/cadence/cadence.module';
+import { ActicityLogModule } from './modules/acticity-log/acticity-log.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
@@ -38,7 +43,10 @@ import { ConfigModule } from '@nestjs/config';
     CampaignModule,
     BillingModule,
     PhoneIdsModule,
+    CadenceModule,
+    ActicityLogModule,
+    DashboardModule,
   ],
   providers: [NotificationsGateway],
 })
-export class AppModule {}
+export class AppModule { }

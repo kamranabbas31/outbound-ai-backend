@@ -1,10 +1,12 @@
 import { Resolver, Query, Args, Mutation, Int } from '@nestjs/graphql';
 import { CampaignsService } from './campaign.service';
 import { Campaigns } from '@prisma/client';
+import { UpdateCampaignInput } from './dto/update-campaign.input';
+import { LeadAttempt } from 'src/graphql';
 
 @Resolver()
 export class CampaignsResolver {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  constructor(private readonly campaignsService: CampaignsService) { }
 
   @Query('fetchCampaigns')
   async fetchCampaigns(@Args('userId') userId: string): Promise<{
@@ -13,7 +15,13 @@ export class CampaignsResolver {
   }> {
     return this.campaignsService.fetchCampaigns(userId);
   }
-
+  @Query('fetchLeadAttempts')
+  async fetchLeadAttempts(@Args('campaignId') campaignId: string): Promise<{
+    userError: { message: string } | null;
+    data: LeadAttempt[] | null;
+  }> {
+    return this.campaignsService.fetchLeadAttempts(campaignId);
+  }
   @Mutation('createCampaign')
   async createCampaign(
     @Args('campaignName') campaignName: string,
@@ -29,11 +37,18 @@ export class CampaignsResolver {
   async addLeadsToCampaign(
     @Args('campaignId') campaignId: string,
     @Args('leads') leads: any[],
+    @Args('cadenceId', { nullable: true }) cadenceId?: string,
+    @Args('cadenceStartDate', { nullable: true }) cadenceStartDate?: Date,
   ): Promise<{
     userError: { message: string } | null;
     data: Campaigns | null;
   }> {
-    return this.campaignsService.addLeadsToCampaign(campaignId, leads);
+    return this.campaignsService.addLeadsToCampaign(
+      campaignId,
+      leads,
+      cadenceId,
+      cadenceStartDate,
+    );
   }
 
   @Query('fetchLeadsForCampaign')
@@ -96,5 +111,27 @@ export class CampaignsResolver {
       campaignId,
       itemsPerPage,
     );
+  }
+
+  @Mutation('attachCadenceToCampaign')
+  async attachCadenceToCampaign(
+    @Args('input')
+    input: {
+      campaignId: string;
+      cadenceId: string;
+      startDate?: Date;
+    },
+  ) {
+    return this.campaignsService.attachCadenceToCampaign(input);
+  }
+
+  @Mutation('stopCadence')
+  async stopCadence(@Args('campaignId') campaignId: string) {
+    return this.campaignsService.stopCadence(campaignId);
+  }
+
+  @Mutation('updateCampaign')
+  async updateCampaign(@Args('input') input: UpdateCampaignInput) {
+    return this.campaignsService.updateCampaign(input);
   }
 }

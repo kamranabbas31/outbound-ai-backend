@@ -1,6 +1,5 @@
 // src/workers/campaign.worker.ts
 import { Worker } from 'bullmq';
-import { ConnectionOptions } from 'tls';
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
@@ -26,6 +25,7 @@ async function bootstrapWorker() {
         campaignId,
         'Pending',
       );
+
       if (allLeadsResult.userError || !allLeadsResult.data) {
         console.error('❌ No leads found or error fetching leads.');
         return;
