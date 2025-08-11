@@ -1,3 +1,6 @@
 type Query {
   getMultipleAvailablePhoneIds(count: Int!): [String!]!
 }
+type Mutation {
+  createPhoneIds(phoneIds: [String!]!): Boolean!
+}

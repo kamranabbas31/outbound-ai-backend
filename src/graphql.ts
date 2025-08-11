@@ -168,6 +168,7 @@ export interface IMutation {
     attachCadenceToCampaign(input: AttachCadenceInput): CadenceAttachResponse | Promise<CadenceAttachResponse>;
     stopCadence(campaignId: string): CadenceAttachResponse | Promise<CadenceAttachResponse>;
     updateCampaign(input: UpdateCampaignInput): UpdateCampaignResponse | Promise<UpdateCampaignResponse>;
+    createPhoneIds(phoneIds: string[]): boolean | Promise<boolean>;
     createUser(data: CreateUserInput): User | Promise<User>;
 }
 

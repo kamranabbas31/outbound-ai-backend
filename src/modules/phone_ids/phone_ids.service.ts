@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PhoneIdsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getMultipleAvailablePhoneIds(count: number): Promise<string[]> {
     const phoneIds = await this.prisma.phone_ids.findMany({
@@ -19,5 +19,23 @@ export class PhoneIdsService {
     });
 
     return phoneIds.map((p) => p.phone_id);
+  }
+
+  async createPhoneIds(phoneIds: string[]) {
+    if (!phoneIds.length) return;
+
+    try {
+      await this.prisma.phone_ids.createMany({
+        data: phoneIds.map((id) => ({
+          phone_id: id,
+        })),
+        skipDuplicates: true, // Avoid inserting duplicates
+      });
+      return true
+    } catch (error) {
+
+      console.error('Error creating phone IDs:', error);
+      return false
+    }
   }
 }
