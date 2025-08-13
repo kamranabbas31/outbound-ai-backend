@@ -10,12 +10,15 @@ import { Queue } from 'bullmq';
 import { redis } from 'src/utils/redis';
 import { UpdateCampaignInput } from './dto/update-campaign.input';
 import { ActivityType } from 'src/graphql';
+import { TriggerCallService } from '../call/trigger-call.service';
 
 @Injectable()
 export class CampaignsService {
   private queue: Queue;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly prisma: PrismaService,
+    private readonly triggerCallService: TriggerCallService
+  ) {
     this.queue = new Queue('campaignQueue', {
       connection: redis,
     });
@@ -392,25 +395,84 @@ export class CampaignsService {
     if (!campaignId)
       return { userError: { message: 'Missing Cmapaign Id' }, success: false };
 
-    const job = await this.queue.add('campaign-job', {
+    const allLeadsResult = await this.fetchLeadsForExecution(
       campaignId,
-      pacingPerSecond,
-    });
+      'Pending',
+    );
 
-    await redis.set(`execStatus:${campaignId}`, 'executing');
+    if (allLeadsResult.userError || !allLeadsResult.data) {
+      console.error('❌ No leads found or error fetching leads.');
+      return { userError: { message: "No Pending leads found or error fetching leads." }, success: false };
+    }
+
+    const pendingLeads = allLeadsResult.data;
+
+    if (pendingLeads.length === 0) {
+      await this.updateCampaignStatus(campaignId, 'idle');
+      return { userError: { message: "No Pending leads found or error fetching leads." }, success: false };
+    }
+
+    await this.updateCampaignStatus(campaignId, 'executing');
+
+    const interval = (1 / parseInt(pacingPerSecond.toString(), 10)) * 1000;
+
+    for (const lead of pendingLeads) {
+      // const execStatus = await redis.get(`execStatus:${campaignId}`);
+      const campaign = await this.prisma.campaigns.findFirst({
+        where: { id: campaignId },
+        select: { execution_status: true },
+      });
+
+      const execStatus = campaign?.execution_status || 'idle';
+      if (execStatus === 'stopped' || execStatus === 'idle') {
+        console.log(`Execution for campaign ${campaignId} was stopped.`);
+        break;
+      }
+
+      console.log(`Calling lead ${lead.id}`);
+
+      try {
+        await this.triggerCallService.triggerCall({ leadId: lead.id });
+      } catch (err) {
+        console.error(
+          `Error triggering call for lead ${lead.id}:`,
+          err.message,
+        );
+      }
+
+      await new Promise((res) => setTimeout(res, interval));
+    }
+
+    await this.updateCampaignStatus(campaignId, 'idle');
+
 
     return { userError: null, success: true };
   }
+
   async stopJob(campaignId: string): Promise<{
     userError: { message: string } | null;
     success: boolean | null;
   }> {
-    if (!campaignId)
-      return { userError: { message: 'Missing Cmapaign Id' }, success: false };
+    if (!campaignId) {
+      return { userError: { message: 'Missing Campaign Id' }, success: false };
+    }
 
-    await redis.set(`execStatus:${campaignId}`, 'stopped');
+    try {
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          execution_status: 'stopped',
+        },
+      });
 
-    return { userError: null, success: true };
+      return { userError: null, success: true };
+    } catch (error) {
+      console.error(`Error stopping campaign ${campaignId}:`, error);
+      return {
+        userError: { message: 'Failed to stop campaign. Please try again.' },
+        success: false,
+      };
+    }
   }
   async getTotalPagesForCampaign(
     campaignId: string,

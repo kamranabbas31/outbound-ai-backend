@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { TriggerCallInput } from './dto/trigger-call.dto';
 import * as https from 'https';
 import { Leads } from '@prisma/client';
+import { CampaignsService } from '../campaign/campaign.service';
 
 @Injectable()
 export class TriggerCallService {
@@ -16,6 +17,8 @@ export class TriggerCallService {
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
   ) { }
+
+
 
   async triggerCall(input: TriggerCallInput) {
     const { leadId, assistantId } = input;
@@ -294,4 +297,8 @@ export class TriggerCallService {
       throw new HttpException(message, error?.response?.status || 500);
     }
   }
+
+
+
+
 }
