@@ -80,7 +80,7 @@ export class WebhookService {
           disposition,
           duration: durationMinutes,
           cost,
-          ...(recordingUrl && { recording_url: recordingUrl }),
+          ...(recordingUrl && { recordingUrl }),
         },
       });
       await tx.leadActivityLog.create({
