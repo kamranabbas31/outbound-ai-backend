@@ -2,14 +2,14 @@
 export function extractContactId(payload) {
   console.log('=== CONTACT ID EXTRACTION DEBUG ===');
   console.log('Full payload keys:', Object.keys(payload));
-  // Check if metadata exists and log its contents
+
   if (payload.metadata) {
     console.log('Metadata found:', JSON.stringify(payload.metadata, null, 2));
-    console.log('Metadata keys:', Object.keys(payload.metadata));
   } else {
     console.log('No metadata found at root level');
   }
-  // Try all possible paths to find contactId with enhanced logging
+
+  // Existing conditions
   if (payload.metadata?.contactId) {
     console.log('✅ Found contactId in metadata:', payload.metadata.contactId);
     return payload.metadata.contactId;
@@ -46,11 +46,38 @@ export function extractContactId(payload) {
     );
     return payload.message.metadata.contactId;
   }
-  // If no contactId found, log the full payload for debugging
+
+  // === NEW CONDITIONS ===
+  if (payload.message?.analysis?.metadata?.contactId) {
+    console.log(
+      '✅ Found contactId in message.analysis.metadata:',
+      payload.message.analysis.metadata.contactId,
+    );
+    return payload.message.analysis.metadata.contactId;
+  }
+
+  if (payload.message?.structuredData?.metadata?.contactId) {
+    console.log(
+      '✅ Found contactId in message.structuredData.metadata:',
+      payload.message.structuredData.metadata.contactId,
+    );
+    return payload.message.structuredData.metadata.contactId;
+  }
+
+  if (payload.message?.artifact?.metadata?.contactId) {
+    console.log(
+      '✅ Found contactId in message.artifact.metadata:',
+      payload.message.artifact.metadata.contactId,
+    );
+    return payload.message.artifact.metadata.contactId;
+  }
+
+  // If still not found
   console.log('❌ No contactId found in any expected location');
   console.log('Full payload for debugging:', JSON.stringify(payload, null, 2));
   return null;
 }
+
 // Extract phone number from various locations in the payload
 export function extractPhoneNumber(payload) {
   if (payload.customer?.number) {
@@ -358,7 +385,7 @@ export function extractDisposition(payload: any): string {
   console.log('DISPOSITION: Using fallback logic');
   if (endReason) {
     console.log('DISPOSITION: Other with end reason:', endReason);
-    return `Other: ${endReason}`;
+    return endReason;
   }
   console.log('DISPOSITION: Unknown (no end reason found)');
   return 'Unknown';
