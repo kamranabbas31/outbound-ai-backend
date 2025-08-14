@@ -2,11 +2,35 @@
 export function extractContactId(payload) {
   console.log('=== CONTACT ID EXTRACTION DEBUG ===');
   console.log('Full payload keys:', Object.keys(payload));
+  
+  // Check if payload is null/undefined
+  if (!payload) {
+    console.log('❌ Payload is null or undefined');
+    return null;
+  }
 
   if (payload.metadata) {
     console.log('Metadata found:', JSON.stringify(payload.metadata, null, 2));
   } else {
     console.log('No metadata found at root level');
+  }
+
+  // Check message structure
+  if (payload.message) {
+    console.log('Message keys:', Object.keys(payload.message));
+    
+    if (payload.message.artifact) {
+      console.log('Artifact keys:', Object.keys(payload.message.artifact));
+      
+      if (payload.message.artifact.assistantOverrides) {
+        console.log('AssistantOverrides keys:', Object.keys(payload.message.artifact.assistantOverrides));
+        
+        if (payload.message.artifact.assistantOverrides.metadata) {
+          console.log('Metadata keys:', Object.keys(payload.message.artifact.assistantOverrides.metadata));
+          console.log('Metadata content:', JSON.stringify(payload.message.artifact.assistantOverrides.metadata, null, 2));
+        }
+      }
+    }
   }
 
   // Existing conditions
@@ -70,6 +94,77 @@ export function extractContactId(payload) {
       payload.message.artifact.metadata.contactId,
     );
     return payload.message.artifact.metadata.contactId;
+  }
+
+  // Additional checks for different field names
+  if (payload.message?.artifact?.assistantOverrides?.metadata?.contact_id) {
+    console.log(
+      '✅ Found contact_id in message.artifact.assistantOverrides.metadata:',
+      payload.message.artifact.assistantOverrides.metadata.contact_id,
+    );
+    return payload.message.artifact.assistantOverrides.metadata.contact_id;
+  }
+
+  if (payload.message?.artifact?.assistantOverrides?.metadata?.contactid) {
+    console.log(
+      '✅ Found contactid in message.artifact.assistantOverrides.metadata:',
+      payload.message.artifact.assistantOverrides.metadata.contactid,
+    );
+    return payload.message.artifact.assistantOverrides.metadata.contactid;
+  }
+
+  // Check for contactId in other possible locations
+  if (payload.message?.artifact?.assistantOverrides?.contactId) {
+    console.log(
+      '✅ Found contactId in message.artifact.assistantOverrides:',
+      payload.message.artifact.assistantOverrides.contactId,
+    );
+    return payload.message.artifact.assistantOverrides.contactId;
+  }
+
+  if (payload.message?.artifact?.contactId) {
+    console.log(
+      '✅ Found contactId in message.artifact:',
+      payload.message.artifact.contactId,
+    );
+    return payload.message.artifact.contactId;
+  }
+
+  // Check for contactId in call object
+  if (payload.message?.artifact?.call?.metadata?.contactId) {
+    console.log(
+      '✅ Found contactId in message.artifact.call.metadata:',
+      payload.message.artifact.call.metadata.contactId,
+    );
+    return payload.message.artifact.call.metadata.contactId;
+  }
+
+  // Deep search for any contactId field
+  const deepSearch = (obj: any, path: string = ''): string | null => {
+    if (!obj || typeof obj !== 'object') return null;
+    
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = path ? `${path}.${key}` : key;
+      
+      if (key === 'contactId' || key === 'contact_id' || key === 'contactid') {
+        console.log(`🔍 Found potential contactId at ${currentPath}:`, value);
+        if (typeof value === 'string' && value.length > 0) {
+          console.log(`✅ Valid contactId found at ${currentPath}:`, value);
+          return value;
+        }
+      }
+      
+      if (typeof value === 'object' && value !== null) {
+        const result = deepSearch(value, currentPath);
+        if (result) return result;
+      }
+    }
+    return null;
+  };
+
+  const deepSearchResult = deepSearch(payload);
+  if (deepSearchResult) {
+    return deepSearchResult;
   }
 
   // If still not found
