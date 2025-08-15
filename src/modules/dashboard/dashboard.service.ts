@@ -15,22 +15,31 @@ export class DashboardService {
         };
     }
     async getDashboardStatsByUser(userId: string, startDate?: string, endDate?: string) {
+        console.log(`[DashboardService] Starting getDashboardStatsByUser for userId: ${userId}, startDate: ${startDate}, endDate: ${endDate}`);
+        
         if (startDate && endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
+            // Parse dates and set time to start/end of day for proper range filtering
+            const start = new Date(startDate + 'T00:00:00.000Z');
+            const end = new Date(endDate + 'T23:59:59.999Z');
+            console.log(`[DashboardService] Date range: ${start.toISOString()} to ${end.toISOString()}`);
 
             // 1️⃣ Get all campaigns of the user
             const campaigns = await this.prisma.campaigns.findMany({
                 where: { user_id: userId },
                 select: { id: true, cadence_template_id: true },
             });
+            console.log(`[DashboardService] Found ${campaigns.length} campaigns for user`);
 
             const campaignIds = campaigns.map(c => c.id);
-            if (!campaignIds.length) return this.emptyStats();
+            if (!campaignIds.length) {
+                console.log(`[DashboardService] No campaigns found, returning empty stats`);
+                return this.emptyStats();
+            }
 
             // Separate cadence vs non-cadence campaigns
             const cadenceCampaignIds = campaigns.filter(c => c.cadence_template_id).map(c => c.id);
             const nonCadenceCampaignIds = campaigns.filter(c => !c.cadence_template_id).map(c => c.id);
+            console.log(`[DashboardService] Cadence campaigns: ${cadenceCampaignIds.length}, Non-cadence campaigns: ${nonCadenceCampaignIds.length}`);
 
             let completed = 0;
             let inProgress = 0;
@@ -44,20 +53,24 @@ export class DashboardService {
                 const leads = await this.prisma.leads.findMany({
                     where: {
                         campaign_id: { in: nonCadenceCampaignIds },
-                        initiated_at: { gte: start, lte: end },
+                        created_at: { gte: start, lte: end },
                     },
                     select: { status: true, duration: true, cost: true },
                 });
 
                 for (const lead of leads) {
-                    switch (lead.status) {
-                        case 'COMPLETED':
+                    const status = lead.status?.toLowerCase();
+                    switch (status) {
+                        case 'completed':
                             completed++;
                             break;
-                        case 'IN_PROGRESS':
+                        case 'in_progress':
                             inProgress++;
                             break;
-                        case 'FAILED':
+                        case 'in progress':
+                            inProgress++;
+                            break;
+                        case 'failed':
                             failed++;
                             break;
                         default:
@@ -79,44 +92,86 @@ export class DashboardService {
                     },
                     select: { lead_id: true, campaign_id: true, duration: true, cost: true },
                 });
+            
+                if (logs.length) {
+                    // === Existing Logic ===
+                    const leadIds = [...new Set(logs.map(l => l.lead_id))];
 
-                const leadIds = [...new Set(logs.map(l => l.lead_id))];
+                    if (leadIds.length) {
+                        const leads = await this.prisma.leads.findMany({
+                            where: { id: { in: leadIds } },
+                            select: { status: true },
+                        });
 
-                if (leadIds.length) {
+                        for (const lead of leads) {
+                            const status = lead.status?.toLowerCase();
+                            switch (status) {
+                                case 'completed':
+                                    completed++;
+                                    break;
+                                case 'in_progress':
+                                    inProgress++;
+                                    break;
+                                    case 'in progress':
+                                        inProgress++;
+                                        break;
+                                case 'failed':
+                                    failed++;
+                                    break;
+                                default:
+                                    remaining++;
+                                    break;
+                            }
+                        }
+                    }
+
+                    // Sum up duration & cost directly from logs
+                    for (const log of logs) {
+                        totalDuration += log.duration ?? 0;
+                        totalCost += log.cost ?? 0;
+                    }
+                } else {
+                    // === NEW FALLBACK LOGIC ===
+                    console.log(`[DashboardService] No logs found — fetching leads directly for cadence campaigns`);
+                    
                     const leads = await this.prisma.leads.findMany({
-                        where: { id: { in: leadIds } },
-                        select: { status: true },
+                        where: { campaign_id: { in: cadenceCampaignIds } },
+                        select: { status: true, duration: true, cost: true },
                     });
 
                     for (const lead of leads) {
-                        switch (lead.status) {
-                            case 'COMPLETED':
+                        const status = lead.status?.toLowerCase();
+                        switch (status) {
+                            case 'completed':
                                 completed++;
                                 break;
-                            case 'IN_PROGRESS':
+                            case 'in_progress':
                                 inProgress++;
                                 break;
-                            case 'FAILED':
+                            case 'in progress':
+                                inProgress++;
+                                break;
+                            case 'failed':
                                 failed++;
                                 break;
                             default:
                                 remaining++;
                                 break;
                         }
+
+                        totalDuration += lead.duration ?? 0;
+                        totalCost += lead.cost ?? 0;
                     }
                 }
-
-                // Sum up duration & cost directly from logs
-                for (const log of logs) {
-                    totalDuration += log.duration ?? 0;
-                    totalCost += log.cost ?? 0;
-                }
             }
-
-            return { completed, inProgress, remaining, failed, totalDuration, totalCost };
+            
+            const finalStats = { completed, inProgress, remaining, failed, totalDuration, totalCost };
+            console.log(`[DashboardService] Final stats with date filter:`, finalStats);
+            return finalStats;
         }
 
         // 4️⃣ Fallback → old logic (no date filter)
+        console.log(`[DashboardService] No date filter provided, using fallback logic`);
         const campaigns = await this.prisma.campaigns.findMany({
             where: { user_id: userId },
             select: { completed: true, in_progress: true, remaining: true, failed: true, duration: true, cost: true },
@@ -138,7 +193,9 @@ export class DashboardService {
             totalCost += campaign.cost ?? 0;
         }
 
-        return { completed, inProgress, remaining, failed, totalDuration, totalCost };
+        const fallbackStats = { completed, inProgress, remaining, failed, totalDuration, totalCost };
+        console.log(`[DashboardService] Fallback stats:`, fallbackStats);
+        return fallbackStats;
     }
 
 }
