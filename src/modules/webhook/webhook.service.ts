@@ -25,23 +25,8 @@ export class WebhookService {
       throw new Error('Invalid JSON payload');
     }
 
-    // ✅ Add webhook deduplication to prevent duplicate processing
-    const contactId = extractContactId(payload);
-    if (contactId) {
-      const existingLog = await this.prisma.leadActivityLog.findFirst({
-        where: {
-          lead_id: contactId,
-          activity_type: 'CALL_ATTEMPT',
-          lead_status: payload.status || 'Completed', // Use status from payload if available
-        },
-        orderBy: { created_at: 'desc' },
-      });
 
-      if (existingLog) {
-        console.log('⚠️ Webhook already processed for lead:', contactId);
-        return; // Skip duplicate processing
-      }
-    }
+    const contactId = extractContactId(payload);
     const phoneNumber = extractPhoneNumber(payload);
     const disposition = extractDisposition(payload);
     const duration = extractDuration(payload);
