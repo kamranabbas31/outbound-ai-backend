@@ -25,29 +25,78 @@ export class CadenceService {
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
-
+  
+    // Step 1: Get campaigns that are *potentially* eligible
     const campaigns = await this.prisma.campaigns.findMany({
       where: {
         cadence_template_id: { not: null },
         cadence_stopped: false,
         cadence_completed: false,
-        cadence_start_date: {
-          lte: new Date(),
+        cadence_start_date: { not: null, lte: new Date() },
+      },
+      select: {
+        id: true,
+        cadence_start_date: true,
+        cadence_template: {
+          select: {
+            id: true,
+            cadence_days: true,
+          },
         },
       },
-      select: { id: true },
     });
-    if (!campaigns || campaigns.length == 0) {
-      this.logger.log('No campaign available for cadence');
-      return
+  
+    if (campaigns.length === 0) {
+      this.logger.log('No campaigns eligible for cadence execution.');
+      return;
     }
+  
+    let queuedCount = 0;
+  
+    // Step 2: Filter campaigns where today is in cadence config & attempts not exhausted
     for (const campaign of campaigns) {
+      const baseDate = campaign.cadence_start_date;
+      const cadenceDays = campaign.cadence_template
+        ?.cadence_days as Record<string, { attempts: number; time_windows: string[] }>;
+  
+      if (!baseDate || !cadenceDays) {
+        this.logger.log(`[SKIP] Campaign ${campaign.id}: Missing baseDate or cadence config`);
+        continue;
+      }
+  
+      const age = differenceInCalendarDays(new Date(), baseDate) + 1;
+      const dayConfig = cadenceDays[age.toString()];
+  
+      if (!dayConfig) {
+        this.logger.log(`[SKIP] Campaign ${campaign.id}: No config for day ${age}`);
+        continue;
+      }
+  
+      // Step 3: Check if today's attempts are already done
+      const attemptsDoneToday = await this.prisma.cadenceProgress.count({
+        where: {
+          campaign_id: campaign.id,
+          cadence_id: campaign?.cadence_template?.id,
+          day: age,
+        },
+      });
+  
+      if (attemptsDoneToday >= dayConfig.attempts) {
+        this.logger.log(
+          `[SKIP] Campaign ${campaign.id}: Max attempts (${dayConfig.attempts}) already done today.`
+        );
+        continue;
+      }
+  
+      // Step 4: Queue it
       await this.cadenceQueue.add('cadence-queue', {
         campaignId: campaign.id,
       });
+  
+      queuedCount++;
     }
-    console.log({ campaigns })
-    this.logger.log('Cadence jobs queued.');
+  
+    this.logger.log(`Cadence jobs queued: ${queuedCount}`);
   }
 
   async executeCampaignCadence(

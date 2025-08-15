@@ -11,7 +11,7 @@ async function bootstrapCadenceWorker() {
   const cadenceService = app.get(CadenceService);
 
   const worker = new Worker(
-    'cadenceQueue',
+    'cadence-queue',
     async (job) => {
       const { campaignId } = job.data;
 
