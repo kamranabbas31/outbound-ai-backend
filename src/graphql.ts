@@ -49,6 +49,13 @@ export interface CreateCadenceTemplateInput {
     cadence_days: CadenceDaysInput[];
 }
 
+export interface UpdateCadenceTemplateInput {
+    id: string;
+    name?: Nullable<string>;
+    retry_dispositions?: Nullable<string[]>;
+    cadence_days?: Nullable<CadenceDaysInput[]>;
+}
+
 export interface TriggerCallInput {
     leadId: string;
     assistantId?: Nullable<string>;
@@ -159,6 +166,7 @@ export interface IMutation {
     login(data: LoginInput): LoginPayload | Promise<LoginPayload>;
     refresh(): AuthPayload | Promise<AuthPayload>;
     createCadenceTemplate(input: CreateCadenceTemplateInput): CreateCadenceTemplateResponse | Promise<CreateCadenceTemplateResponse>;
+    updateCadenceTemplate(input: UpdateCadenceTemplateInput): UpdateCadenceTemplateResponse | Promise<UpdateCadenceTemplateResponse>;
     deleteCadenceTemplate(id: string): DeleteCadenceTemplateResponse | Promise<DeleteCadenceTemplateResponse>;
     triggerCall(input: TriggerCallInput): TriggerCallResponse | Promise<TriggerCallResponse>;
     createCampaign(campaignName: string, userId: string): CampaignResponse | Promise<CampaignResponse>;
@@ -216,6 +224,11 @@ export interface CadenceTemplate {
 }
 
 export interface CreateCadenceTemplateResponse {
+    userError?: Nullable<UserError>;
+    template?: Nullable<CadenceTemplate>;
+}
+
+export interface UpdateCadenceTemplateResponse {
     userError?: Nullable<UserError>;
     template?: Nullable<CadenceTemplate>;
 }

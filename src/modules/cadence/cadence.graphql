@@ -31,11 +31,23 @@ input CreateCadenceTemplateInput {
   cadence_days: [CadenceDaysInput!]!
 }
 
+input UpdateCadenceTemplateInput {
+  id: String!
+  name: String
+  retry_dispositions: [String!]
+  cadence_days: [CadenceDaysInput!]
+}
+
 type UserError {
   message: String
 }
 
 type CreateCadenceTemplateResponse {
+  userError: UserError
+  template: CadenceTemplate
+}
+
+type UpdateCadenceTemplateResponse {
   userError: UserError
   template: CadenceTemplate
 }
@@ -58,5 +70,8 @@ type Mutation {
   createCadenceTemplate(
     input: CreateCadenceTemplateInput!
   ): CreateCadenceTemplateResponse!
+  updateCadenceTemplate(
+    input: UpdateCadenceTemplateInput!
+  ): UpdateCadenceTemplateResponse!
   deleteCadenceTemplate(id: String!): DeleteCadenceTemplateResponse!
 }

@@ -30,6 +30,24 @@ export class CadenceResolver {
     }
   }
 
+  @Mutation('updateCadenceTemplate')
+  async updateCadenceTemplate(@Args('input') input) {
+    try {
+      const template = await this.cadenceService.updateCadenceTemplate(input);
+      return {
+        userError: null,
+        template,
+      };
+    } catch (error) {
+      return {
+        userError: {
+          message: error.message || 'Failed to update cadence template',
+        },
+        template: null,
+      };
+    }
+  }
+
   @Mutation('deleteCadenceTemplate')
   async deleteCadenceTemplate(@Args('id') id: string) {
     return this.cadenceService.deleteCadenceTemplate(id);

@@ -471,7 +471,7 @@ export function extractDisposition(payload: any): string {
     endReason?.toLowerCase().includes('customer ended call') ||
     endReason?.toLowerCase().includes('customer-ended-call') ||
     endReason?.toLowerCase().includes('hung up') ||
-    endReason?.toLowerCase().includes('disconnected')
+    endReason?.toLowerCase().includes('disconnected') ||  endReason?.toLowerCase().includes('assistant-ended-call') || endReason?.toLowerCase().includes('assistant ended call')
   ) {
     console.log('DISPOSITION: Hang Up detected');
     return 'Hang Up';

@@ -42,7 +42,7 @@ export class CadenceService {
       return
     }
     for (const campaign of campaigns) {
-      await this.cadenceQueue.add('execute-cadence', {
+      await this.cadenceQueue.add('cadence-queue', {
         campaignId: campaign.id,
       });
     }
@@ -303,6 +303,81 @@ export class CadenceService {
     });
   }
 
+  async updateCadenceTemplate(input: {
+    id: string;
+    name?: string;
+    retry_dispositions?: string[];
+    cadence_days?: {
+      day: string;
+      config: {
+        attempts: number;
+        time_windows: string[];
+      };
+    }[];
+  }) {
+    const { id, name, retry_dispositions, cadence_days } = input;
+
+    // 🔍 Check if the cadence template exists
+    const existing = await this.prisma.cadenceTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new Error('Cadence template not found.');
+    }
+
+    // 🔒 If updating name, check if another cadence with the same name already exists
+    if (name && name !== existing.name) {
+      const nameConflict = await this.prisma.cadenceTemplate.findFirst({
+        where: { 
+          name,
+          id: { not: id } // Exclude current template from check
+        },
+      });
+
+      if (nameConflict) {
+        throw new Error('A cadence template with this name already exists.');
+      }
+    }
+
+    // 🧱 Build the update data object
+    const updateData: any = {};
+    
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    
+    if (retry_dispositions !== undefined) {
+      updateData.retry_dispositions = retry_dispositions;
+    }
+    
+    if (cadence_days !== undefined) {
+      // Build the JSON cadence_days map
+      const cadenceMap: Record<
+        string,
+        { attempts: number; time_windows: string[] }
+      > = {};
+      for (const { day, config } of cadence_days) {
+        cadenceMap[day] = config;
+      }
+      updateData.cadence_days = cadenceMap;
+    }
+
+    // ✅ Update the cadence template
+    return this.prisma.cadenceTemplate.update({
+      where: { id },
+      data: updateData,
+      include: {
+        campaigns: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
   async attachCadenceToCampaign(input: {
     campaignId: string;
     cadenceId: string;
@@ -365,6 +440,20 @@ export class CadenceService {
 
   async deleteCadenceTemplate(id: string) {
     try {
+      const attachedCampaigns = await this.prisma.campaigns.findMany({
+        where: { cadence_template_id: id },
+        select: { name: true },
+      });
+
+      if (attachedCampaigns.length > 0) {
+        const campaignNames = attachedCampaigns.map(c => c.name).join(', ');
+        return {
+          userError: {
+            message: `The following campaign(s) are attached to this cadence: ${campaignNames}. Please unlink them first to delete.`,
+          },
+          success: false,
+        };
+      }
       await this.prisma.cadenceTemplate.delete({
         where: { id },
       });
@@ -379,4 +468,6 @@ export class CadenceService {
       };
     }
   }
+
+  
 }
