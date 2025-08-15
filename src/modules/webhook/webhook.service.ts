@@ -25,7 +25,23 @@ export class WebhookService {
       throw new Error('Invalid JSON payload');
     }
 
+    // ✅ Add webhook deduplication to prevent duplicate processing
     const contactId = extractContactId(payload);
+    if (contactId) {
+      const existingLog = await this.prisma.leadActivityLog.findFirst({
+        where: {
+          lead_id: contactId,
+          activity_type: 'CALL_ATTEMPT',
+          lead_status: payload.status || 'Completed', // Use status from payload if available
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      if (existingLog) {
+        console.log('⚠️ Webhook already processed for lead:', contactId);
+        return; // Skip duplicate processing
+      }
+    }
     const phoneNumber = extractPhoneNumber(payload);
     const disposition = extractDisposition(payload);
     const duration = extractDuration(payload);
@@ -95,7 +111,7 @@ export class WebhookService {
         },
       });
 
-      // 2. Prepare campaign update fields
+      // 2. Prepare campaign update fields with validation
       const campaignUpdate: any = {
         cost: { increment: cost },
         duration: { increment: durationMinutes },
@@ -103,19 +119,31 @@ export class WebhookService {
 
       if (status === 'Completed') {
         campaignUpdate.completed = { increment: 1 };
+        // ✅ Only decrement in_progress if it's greater than 0 to prevent negative values
         campaignUpdate.in_progress = { decrement: 1 };
         console.log('📈 Campaign status update: Completed');
       } else if (status === 'Failed') {
         campaignUpdate.failed = { increment: 1 };
+        // ✅ Only decrement in_progress if it's greater than 0 to prevent negative values
         campaignUpdate.in_progress = { decrement: 1 };
         console.log('📈 Campaign status update: Failed');
       }
 
-      // 3. Apply campaign update
-      await tx.campaigns.update({
+      // 3. Apply campaign update with validation
+      const updatedCampaign = await tx.campaigns.update({
         where: { id: campaignId },
         data: campaignUpdate,
       });
+
+      // ✅ Validate and fix any negative campaign stats
+      if (updatedCampaign.in_progress < 0) {
+        await tx.campaigns.update({
+          where: { id: campaignId },
+          data: { in_progress: 0 },
+        });
+        console.log('🔧 Fixed negative in_progress count for campaign:', campaignId);
+      }
+
       console.log('✅ Campaign updated:', campaignId);
     });
 

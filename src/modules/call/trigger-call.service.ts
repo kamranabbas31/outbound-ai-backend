@@ -85,6 +85,16 @@ export class TriggerCallService {
         }),
       );
 
+      // ✅ Check if lead is already in progress to prevent double counting
+      if (lead.status === 'In Progress') {
+        console.log('⚠️ Lead already in progress:', leadId);
+        return {
+          success: true,
+          message: 'Call already in progress',
+          data: null,
+        };
+      }
+
       await this.prisma.$transaction([
         this.prisma.leads.update({
           where: { id: leadId },

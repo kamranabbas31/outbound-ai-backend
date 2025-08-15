@@ -186,6 +186,8 @@ export class CampaignsService {
         leads_count: totalCount,
         remaining: pendingCount,
         failed: failedCount,
+        completed: completedCount,        // ✅ Explicitly set completed count
+        in_progress: inProgressCount,     // ✅ Explicitly set in_progress count
         status: newStatus,
       };
 
@@ -372,6 +374,51 @@ export class CampaignsService {
       return {
         userError: { message: 'Internal server error' },
         data: null,
+      };
+    }
+  }
+
+  // ✅ Add function to recalculate and fix campaign stats
+  async recalculateCampaignStats(campaignId: string): Promise<{
+    userError: { message: string } | null;
+    success: boolean;
+  }> {
+    try {
+      const [pendingCount, failedCount, completedCount, inProgressCount, totalCount] = 
+        await Promise.all([
+          this.prisma.leads.count({
+            where: { campaign_id: campaignId, status: 'Pending' },
+          }),
+          this.prisma.leads.count({
+            where: { campaign_id: campaignId, status: 'Failed' },
+          }),
+          this.prisma.leads.count({
+            where: { campaign_id: campaignId, status: 'Completed' },
+          }),
+          this.prisma.leads.count({
+            where: { campaign_id: campaignId, status: 'InProgress' },
+          }),
+          this.prisma.leads.count({ where: { campaign_id: campaignId } }),
+        ]);
+
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          leads_count: totalCount,
+          completed: completedCount,
+          in_progress: inProgressCount,
+          remaining: pendingCount,
+          failed: failedCount,
+        },
+      });
+
+      console.log('✅ Campaign stats recalculated for:', campaignId);
+      return { userError: null, success: true };
+    } catch (error) {
+      console.error('Error recalculating campaign stats:', error);
+      return {
+        userError: { message: 'Failed to recalculate campaign stats' },
+        success: false,
       };
     }
   }
