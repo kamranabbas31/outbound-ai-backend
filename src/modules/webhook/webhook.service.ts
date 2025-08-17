@@ -73,7 +73,13 @@ export class WebhookService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. Update the lead
+      // 1. Get the lead's current status before updating
+      const currentLead = await tx.leads.findUnique({
+        where: { id: leadId },
+        select: { status: true },
+      });
+
+      // 2. Update the lead
       await tx.leads.update({
         where: { id: leadId },
         data: {
@@ -96,25 +102,34 @@ export class WebhookService {
         },
       });
 
-      // 2. Prepare campaign update fields with validation
+      // 3. Prepare campaign update fields with validation
       const campaignUpdate: any = {
         cost: { increment: cost },
         duration: { increment: durationMinutes },
       };
 
+      // ✅ Only decrement in_progress if the lead was actually in progress
+      const wasInProgress = currentLead?.status === 'In Progress';
+      
       if (status === 'Completed') {
         campaignUpdate.completed = { increment: 1 };
-        // ✅ Only decrement in_progress if it's greater than 0 to prevent negative values
-        campaignUpdate.in_progress = { decrement: 1 };
-        console.log('📈 Campaign status update: Completed');
+        if (wasInProgress) {
+          campaignUpdate.in_progress = { decrement: 1 };
+          console.log('📈 Campaign status update: Completed (was in progress)');
+        } else {
+          console.log('📈 Campaign status update: Completed (was not in progress)');
+        }
       } else if (status === 'Failed') {
         campaignUpdate.failed = { increment: 1 };
-        // ✅ Only decrement in_progress if it's greater than 0 to prevent negative values
-        campaignUpdate.in_progress = { decrement: 1 };
-        console.log('📈 Campaign status update: Failed');
+        if (wasInProgress) {
+          campaignUpdate.in_progress = { decrement: 1 };
+          console.log('📈 Campaign status update: Failed (was in progress)');
+        } else {
+          console.log('📈 Campaign status update: Failed (was not in progress)');
+        }
       }
 
-      // 3. Apply campaign update with validation
+      // 4. Apply campaign update with validation
       const updatedCampaign = await tx.campaigns.update({
         where: { id: campaignId },
         data: campaignUpdate,

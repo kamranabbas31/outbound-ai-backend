@@ -230,11 +230,9 @@ export class TriggerCallService {
           status: 'InProgress',
         };
 
-        if (lead.status === 'Failed') {
-          updates.failed = { decrement: 1 };
-        } else if (lead.status === 'Completed') {
-          updates.completed = { decrement: 1 };
-        }
+        // ✅ FIXED: Don't decrement completed/failed when retrying leads
+        // This prevents campaign stats from becoming incorrect
+        // The webhook will handle the final status updates correctly
 
         // Update lead and campaign
         await tx.leads.update({
@@ -250,6 +248,37 @@ export class TriggerCallService {
           where: { id: lead.campaign_id },
           data: updates,
         });
+
+        // ✅ Safety check: Prevent negative campaign stats
+        const updatedCampaign = await tx.campaigns.findUnique({
+          where: { id: lead.campaign_id },
+          select: { in_progress: true, remaining: true, completed: true, failed: true },
+        });
+
+        if (updatedCampaign) {
+          const safetyUpdates: any = {};
+          
+          if (updatedCampaign.in_progress < 0) {
+            safetyUpdates.in_progress = 0;
+          }
+          if (updatedCampaign.remaining < 0) {
+            safetyUpdates.remaining = 0;
+          }
+          if (updatedCampaign.completed < 0) {
+            safetyUpdates.completed = 0;
+          }
+          if (updatedCampaign.failed < 0) {
+            safetyUpdates.failed = 0;
+          }
+
+          if (Object.keys(safetyUpdates).length > 0) {
+            await tx.campaigns.update({
+              where: { id: lead.campaign_id },
+              data: safetyUpdates,
+            });
+            console.log('🔧 Fixed negative campaign stats:', safetyUpdates);
+          }
+        }
       });
 
       return {
