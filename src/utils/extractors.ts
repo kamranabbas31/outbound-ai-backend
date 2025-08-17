@@ -2,7 +2,7 @@
 export function extractContactId(payload) {
   console.log('=== CONTACT ID EXTRACTION DEBUG ===');
   console.log('Full payload keys:', Object.keys(payload));
-  
+
   // Check if payload is null/undefined
   if (!payload) {
     console.log('❌ Payload is null or undefined');
@@ -18,16 +18,29 @@ export function extractContactId(payload) {
   // Check message structure
   if (payload.message) {
     console.log('Message keys:', Object.keys(payload.message));
-    
+
     if (payload.message.artifact) {
       console.log('Artifact keys:', Object.keys(payload.message.artifact));
-      
+
       if (payload.message.artifact.assistantOverrides) {
-        console.log('AssistantOverrides keys:', Object.keys(payload.message.artifact.assistantOverrides));
-        
+        console.log(
+          'AssistantOverrides keys:',
+          Object.keys(payload.message.artifact.assistantOverrides),
+        );
+
         if (payload.message.artifact.assistantOverrides.metadata) {
-          console.log('Metadata keys:', Object.keys(payload.message.artifact.assistantOverrides.metadata));
-          console.log('Metadata content:', JSON.stringify(payload.message.artifact.assistantOverrides.metadata, null, 2));
+          console.log(
+            'Metadata keys:',
+            Object.keys(payload.message.artifact.assistantOverrides.metadata),
+          );
+          console.log(
+            'Metadata content:',
+            JSON.stringify(
+              payload.message.artifact.assistantOverrides.metadata,
+              null,
+              2,
+            ),
+          );
         }
       }
     }
@@ -142,10 +155,10 @@ export function extractContactId(payload) {
   // Deep search for any contactId field
   const deepSearch = (obj: any, path: string = ''): string | null => {
     if (!obj || typeof obj !== 'object') return null;
-    
+
     for (const [key, value] of Object.entries(obj)) {
       const currentPath = path ? `${path}.${key}` : key;
-      
+
       if (key === 'contactId' || key === 'contact_id' || key === 'contactid') {
         console.log(`🔍 Found potential contactId at ${currentPath}:`, value);
         if (typeof value === 'string' && value.length > 0) {
@@ -153,7 +166,7 @@ export function extractContactId(payload) {
           return value;
         }
       }
-      
+
       if (typeof value === 'object' && value !== null) {
         const result = deepSearch(value, currentPath);
         if (result) return result;
@@ -350,15 +363,40 @@ export function extractDisposition(payload: any): string {
   const lowerContent = content.toLowerCase();
   console.log('Combined content length:', content.length);
   console.log('Content preview:', content.substring(0, 200) + '...');
+  const digitSequencePattern = /\b\d(?:\s+\d){2,}\b/;
   // Check for Answering Machine first
   if (
     lowerContent.includes('leave a message') ||
+    lowerContent.includes('leave your message') ||
+    lowerContent.includes('leave message') ||
+    lowerContent.includes('at the tone') ||
+    lowerContent.includes('voicemail') ||
+    lowerContent.includes('voice messaging system') ||
+    lowerContent.includes("can't take your call") ||
+    lowerContent.includes('after the beep') ||
+    lowerContent.includes('recording') ||
     lowerContent.includes('at the tone') ||
     lowerContent.includes('voicemail') ||
     lowerContent.includes("can't take your call") ||
     lowerContent.includes('after the beep') ||
     lowerContent.includes('recording') ||
-    endReason?.toLowerCase().includes('voicemail')
+    endReason?.toLowerCase().includes('voicemail') ||
+    lowerContent.includes('leave your message') ||
+    lowerContent.includes('at the tone') ||
+    lowerContent.includes('voicemail') ||
+    lowerContent.includes('voice mailbox') ||
+    lowerContent.includes('voicemail box') ||
+    lowerContent.includes("can't take your call") ||
+    lowerContent.includes('no 1 available') ||
+    lowerContent.includes('no one available') ||
+    lowerContent.includes('unavailable') ||
+    lowerContent.includes('after the beep') ||
+    lowerContent.includes('recording') ||
+    lowerContent.includes('automated voice messaging system') ||
+    lowerContent.includes('automated voice') ||
+    (lowerContent.includes('not available') &&
+      lowerContent.includes('message')) ||
+    digitSequencePattern.test(lowerContent)
   ) {
     console.log('DISPOSITION: Answering Machine detected');
     return 'Answering Machine';
@@ -471,7 +509,9 @@ export function extractDisposition(payload: any): string {
     endReason?.toLowerCase().includes('customer ended call') ||
     endReason?.toLowerCase().includes('customer-ended-call') ||
     endReason?.toLowerCase().includes('hung up') ||
-    endReason?.toLowerCase().includes('disconnected') ||  endReason?.toLowerCase().includes('assistant-ended-call') || endReason?.toLowerCase().includes('assistant ended call')
+    endReason?.toLowerCase().includes('disconnected') ||
+    endReason?.toLowerCase().includes('assistant-ended-call') ||
+    endReason?.toLowerCase().includes('assistant ended call')
   ) {
     console.log('DISPOSITION: Hang Up detected');
     return 'Hang Up';

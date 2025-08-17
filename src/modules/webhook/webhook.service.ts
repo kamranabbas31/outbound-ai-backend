@@ -12,7 +12,7 @@ import {
 
 @Injectable()
 export class WebhookService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async processWebhook(rawBody: string): Promise<void> {
     let payload: any;
@@ -24,7 +24,6 @@ export class WebhookService {
       console.error('❌ Invalid JSON payload');
       throw new Error('Invalid JSON payload');
     }
-
 
     const contactId = extractContactId(payload);
     const phoneNumber = extractPhoneNumber(payload);
@@ -111,22 +110,26 @@ export class WebhookService {
 
       // ✅ Only decrement in_progress if the lead was actually in progress
       const wasInProgress = currentLead?.status === 'In Progress';
-      
+
       if (status === 'Completed') {
-        campaignUpdate.completed = { increment: 1 };
         if (wasInProgress) {
+          campaignUpdate.completed = { increment: 1 };
           campaignUpdate.in_progress = { decrement: 1 };
           console.log('📈 Campaign status update: Completed (was in progress)');
         } else {
-          console.log('📈 Campaign status update: Completed (was not in progress)');
+          console.log(
+            '📈 Campaign status update: Completed (was not in progress)',
+          );
         }
       } else if (status === 'Failed') {
-        campaignUpdate.failed = { increment: 1 };
         if (wasInProgress) {
+          campaignUpdate.failed = { increment: 1 };
           campaignUpdate.in_progress = { decrement: 1 };
           console.log('📈 Campaign status update: Failed (was in progress)');
         } else {
-          console.log('📈 Campaign status update: Failed (was not in progress)');
+          console.log(
+            '📈 Campaign status update: Failed (was not in progress)',
+          );
         }
       }
 
@@ -139,19 +142,19 @@ export class WebhookService {
       // 5. Validate and fix campaign stats balance
       const campaignStats = await tx.campaigns.findUnique({
         where: { id: campaignId },
-        select: { 
-          in_progress: true, 
-          remaining: true, 
-          completed: true, 
+        select: {
+          in_progress: true,
+          remaining: true,
+          completed: true,
           failed: true,
-          leads_count: true 
+          leads_count: true,
         },
       });
 
       if (campaignStats) {
         // Safety check: Prevent negative values
         const safetyUpdates: any = {};
-        
+
         if (campaignStats.in_progress < 0) {
           safetyUpdates.in_progress = 0;
         }
@@ -174,10 +177,16 @@ export class WebhookService {
         }
 
         // Validate total balance
-        const calculatedTotal = campaignStats.completed + campaignStats.in_progress + campaignStats.remaining + campaignStats.failed;
+        const calculatedTotal =
+          campaignStats.completed +
+          campaignStats.in_progress +
+          campaignStats.remaining +
+          campaignStats.failed;
         if (calculatedTotal !== campaignStats.leads_count) {
-          console.warn(`⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${campaignStats.leads_count}`);
-          
+          console.warn(
+            `⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${campaignStats.leads_count}`,
+          );
+
           // Auto-fix: Recalculate stats based on actual lead counts
           const actualStats = await tx.leads.groupBy({
             by: ['status'],
@@ -185,10 +194,19 @@ export class WebhookService {
             _count: { status: true },
           });
 
-          const actualCompleted = actualStats.find(s => s.status === 'Completed')?._count.status || 0;
-          const actualInProgress = actualStats.find(s => s.status === 'In Progress')?._count.status || 0;
-          const actualFailed = actualStats.find(s => s.status === 'Failed')?._count.status || 0;
-          const actualRemaining = campaignStats.leads_count - actualCompleted - actualInProgress - actualFailed;
+          const actualCompleted =
+            actualStats.find((s) => s.status === 'Completed')?._count.status ||
+            0;
+          const actualInProgress =
+            actualStats.find((s) => s.status === 'In Progress')?._count
+              .status || 0;
+          const actualFailed =
+            actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
+          const actualRemaining =
+            campaignStats.leads_count -
+            actualCompleted -
+            actualInProgress -
+            actualFailed;
 
           await tx.campaigns.update({
             where: { id: campaignId },
