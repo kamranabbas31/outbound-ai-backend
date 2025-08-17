@@ -95,24 +95,65 @@ export class TriggerCallService {
         };
       }
 
-      await this.prisma.$transaction([
-        this.prisma.leads.update({
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Update lead status to In Progress
+        await tx.leads.update({
           where: { id: leadId },
           data: {
             status: 'In Progress',
             disposition: 'Call initiated',
             initiated_at: new Date(),
           },
-        }),
-        this.prisma.campaigns.update({
+        });
+
+        // 2. Update campaign stats: decrement remaining, increment in_progress
+        await tx.campaigns.update({
           where: { id: lead.campaign_id },
           data: {
             in_progress: { increment: 1 },
             remaining: { decrement: 1 },
             status: 'InProgress',
           },
-        }),
-      ]);
+        });
+
+        // 3. Validate campaign stats balance
+        const updatedCampaign = await tx.campaigns.findUnique({
+          where: { id: lead.campaign_id },
+          select: { 
+            in_progress: true, 
+            remaining: true, 
+            completed: true, 
+            failed: true,
+            leads_count: true 
+          },
+        });
+
+        if (updatedCampaign) {
+          // Safety check: Prevent negative values
+          const safetyUpdates: any = {};
+          
+          if (updatedCampaign.in_progress < 0) {
+            safetyUpdates.in_progress = 0;
+          }
+          if (updatedCampaign.remaining < 0) {
+            safetyUpdates.remaining = 0;
+          }
+
+          if (Object.keys(safetyUpdates).length > 0) {
+            await tx.campaigns.update({
+              where: { id: lead.campaign_id },
+              data: safetyUpdates,
+            });
+            console.log('🔧 Fixed negative campaign stats:', safetyUpdates);
+          }
+
+          // Validate total balance
+          const calculatedTotal = updatedCampaign.completed + updatedCampaign.in_progress + updatedCampaign.remaining + updatedCampaign.failed;
+          if (calculatedTotal !== updatedCampaign.leads_count) {
+            console.warn(`⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${updatedCampaign.leads_count}`);
+          }
+        }
+      });
 
       return {
         success: true,
@@ -132,6 +173,50 @@ export class TriggerCallService {
           },
         });
 
+        // Update campaign stats: decrement remaining, increment failed
+        await tx.campaigns.update({
+          where: { id: lead.campaign_id },
+          data: {
+            remaining: { decrement: 1 },
+            failed: { increment: 1 },
+          },
+        });
+
+        // Validate campaign stats balance
+        const updatedCampaign = await tx.campaigns.findUnique({
+          where: { id: lead.campaign_id },
+          select: { 
+            in_progress: true, 
+            remaining: true, 
+            completed: true, 
+            failed: true,
+            leads_count: true 
+          },
+        });
+
+        if (updatedCampaign) {
+          // Safety check: Prevent negative values
+          const safetyUpdates: any = {};
+          
+          if (updatedCampaign.remaining < 0) {
+            safetyUpdates.remaining = 0;
+          }
+
+          if (Object.keys(safetyUpdates).length > 0) {
+            await tx.campaigns.update({
+              where: { id: lead.campaign_id },
+              data: safetyUpdates,
+            });
+            console.log('🔧 Fixed negative campaign stats:', safetyUpdates);
+          }
+
+          // Validate total balance
+          const calculatedTotal = updatedCampaign.completed + updatedCampaign.in_progress + updatedCampaign.remaining + updatedCampaign.failed;
+          if (calculatedTotal !== updatedCampaign.leads_count) {
+            console.warn(`⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${updatedCampaign.leads_count}`);
+          }
+        }
+
         const [failed, total] = await Promise.all([
           tx.leads.count({
             where: { campaign_id: lead.campaign_id, status: 'Failed' },
@@ -146,14 +231,12 @@ export class TriggerCallService {
           newStatus = 'Failed';
         }
 
-        await tx.campaigns.update({
-          where: { id: lead.campaign_id },
-          data: {
-            remaining: { decrement: 1 },
-            failed: { increment: 1 },
-            ...(newStatus === 'Failed' && { status: newStatus }),
-          },
-        });
+        if (newStatus === 'Failed') {
+          await tx.campaigns.update({
+            where: { id: lead.campaign_id },
+            data: { status: newStatus },
+          });
+        }
       });
 
       throw new HttpException(message, error?.response?.status || 500);
@@ -223,16 +306,35 @@ export class TriggerCallService {
 
       await this.prisma.$transaction(async (tx) => {
         const previousDisposition = lead.disposition || 'Unknown';
-
-        const updates: any = {
-          in_progress: { increment: 1 },
-          remaining: { decrement: 1 },
+        // Adjust campaign stats based on previous lead status
+        const campaignStatUpdates: any = {
+          in_progress: { increment: 1 },    
           status: 'InProgress',
         };
-
-        // ✅ FIXED: Don't decrement completed/failed when retrying leads
-        // This prevents campaign stats from becoming incorrect
-        // The webhook will handle the final status updates correctly
+        
+        if (lead.status === 'Completed') {
+          // Decrement the completed count
+          campaignStatUpdates.completed = { decrement: 1 };
+        } else if (lead.status === 'Failed') {
+          // Decrement the failed count
+          campaignStatUpdates.failed = { decrement: 1 };
+        }
+        
+        // Apply the stat adjustments if needed
+        if (Object.keys(campaignStatUpdates).length > 0) {
+          await tx.campaigns.update({
+            where: { id: lead.campaign_id },
+            data: campaignStatUpdates,
+          });
+        }
+        await tx.campaigns.update({
+          where: { id: lead.campaign_id },
+          data: {
+            in_progress: { increment: 1 },
+            remaining: { decrement: 1 },
+            status: 'InProgress',
+          },
+        });
 
         // Update lead and campaign
         await tx.leads.update({
@@ -244,15 +346,18 @@ export class TriggerCallService {
           },
         });
 
-        await tx.campaigns.update({
-          where: { id: lead.campaign_id },
-          data: updates,
-        });
-
+        // Update campaign stats: decrement remaining, increment in_progress
+      
         // ✅ Safety check: Prevent negative campaign stats
         const updatedCampaign = await tx.campaigns.findUnique({
           where: { id: lead.campaign_id },
-          select: { in_progress: true, remaining: true, completed: true, failed: true },
+          select: { 
+            in_progress: true, 
+            remaining: true, 
+            completed: true, 
+            failed: true,
+            leads_count: true 
+          },
         });
 
         if (updatedCampaign) {
@@ -264,12 +369,6 @@ export class TriggerCallService {
           if (updatedCampaign.remaining < 0) {
             safetyUpdates.remaining = 0;
           }
-          if (updatedCampaign.completed < 0) {
-            safetyUpdates.completed = 0;
-          }
-          if (updatedCampaign.failed < 0) {
-            safetyUpdates.failed = 0;
-          }
 
           if (Object.keys(safetyUpdates).length > 0) {
             await tx.campaigns.update({
@@ -277,6 +376,12 @@ export class TriggerCallService {
               data: safetyUpdates,
             });
             console.log('🔧 Fixed negative campaign stats:', safetyUpdates);
+          }
+
+          // Validate total balance
+          const calculatedTotal = updatedCampaign.completed + updatedCampaign.in_progress + updatedCampaign.remaining + updatedCampaign.failed;
+          if (calculatedTotal !== updatedCampaign.leads_count) {
+            console.warn(`⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${updatedCampaign.leads_count}`);
           }
         }
       });
@@ -302,7 +407,7 @@ export class TriggerCallService {
           data: {
             lead_id: lead.id,
             campaign_id: lead.campaign_id,
-            lead_status: "Faled",
+            lead_status: "Failed",
             activity_type: 'CALL_ATTEMPT',
             to_disposition: `API Error: ${message}`,
             duration: 0,

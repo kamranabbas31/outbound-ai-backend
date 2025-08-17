@@ -90,6 +90,7 @@ export class WebhookService {
           ...(recordingUrl && { recordingUrl }),
         },
       });
+
       await tx.leadActivityLog.create({
         data: {
           lead_id: leadId,
@@ -102,7 +103,7 @@ export class WebhookService {
         },
       });
 
-      // 3. Prepare campaign update fields with validation
+      // 3. Prepare campaign update fields with proper stats balancing
       const campaignUpdate: any = {
         cost: { increment: cost },
         duration: { increment: durationMinutes },
@@ -129,19 +130,82 @@ export class WebhookService {
         }
       }
 
-      // 4. Apply campaign update with validation
+      // 4. Apply campaign update
       const updatedCampaign = await tx.campaigns.update({
         where: { id: campaignId },
         data: campaignUpdate,
       });
 
-      // ✅ Validate and fix any negative campaign stats
-      if (updatedCampaign.in_progress < 0) {
-        await tx.campaigns.update({
-          where: { id: campaignId },
-          data: { in_progress: 0 },
-        });
-        console.log('🔧 Fixed negative in_progress count for campaign:', campaignId);
+      // 5. Validate and fix campaign stats balance
+      const campaignStats = await tx.campaigns.findUnique({
+        where: { id: campaignId },
+        select: { 
+          in_progress: true, 
+          remaining: true, 
+          completed: true, 
+          failed: true,
+          leads_count: true 
+        },
+      });
+
+      if (campaignStats) {
+        // Safety check: Prevent negative values
+        const safetyUpdates: any = {};
+        
+        if (campaignStats.in_progress < 0) {
+          safetyUpdates.in_progress = 0;
+        }
+        if (campaignStats.remaining < 0) {
+          safetyUpdates.remaining = 0;
+        }
+        if (campaignStats.completed < 0) {
+          safetyUpdates.completed = 0;
+        }
+        if (campaignStats.failed < 0) {
+          safetyUpdates.failed = 0;
+        }
+
+        if (Object.keys(safetyUpdates).length > 0) {
+          await tx.campaigns.update({
+            where: { id: campaignId },
+            data: safetyUpdates,
+          });
+          console.log('🔧 Fixed negative campaign stats:', safetyUpdates);
+        }
+
+        // Validate total balance
+        const calculatedTotal = campaignStats.completed + campaignStats.in_progress + campaignStats.remaining + campaignStats.failed;
+        if (calculatedTotal !== campaignStats.leads_count) {
+          console.warn(`⚠️ Campaign stats imbalance detected: calculated=${calculatedTotal}, expected=${campaignStats.leads_count}`);
+          
+          // Auto-fix: Recalculate stats based on actual lead counts
+          const actualStats = await tx.leads.groupBy({
+            by: ['status'],
+            where: { campaign_id: campaignId },
+            _count: { status: true },
+          });
+
+          const actualCompleted = actualStats.find(s => s.status === 'Completed')?._count.status || 0;
+          const actualInProgress = actualStats.find(s => s.status === 'In Progress')?._count.status || 0;
+          const actualFailed = actualStats.find(s => s.status === 'Failed')?._count.status || 0;
+          const actualRemaining = campaignStats.leads_count - actualCompleted - actualInProgress - actualFailed;
+
+          await tx.campaigns.update({
+            where: { id: campaignId },
+            data: {
+              completed: actualCompleted,
+              in_progress: actualInProgress,
+              failed: actualFailed,
+              remaining: Math.max(0, actualRemaining),
+            },
+          });
+          console.log('🔧 Auto-fixed campaign stats imbalance:', {
+            completed: actualCompleted,
+            in_progress: actualInProgress,
+            failed: actualFailed,
+            remaining: Math.max(0, actualRemaining),
+          });
+        }
       }
 
       console.log('✅ Campaign updated:', campaignId);
