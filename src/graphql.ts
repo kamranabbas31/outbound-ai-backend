@@ -211,7 +211,7 @@ export interface Campaign {
     cadence_start_date?: Nullable<DateTime>;
     cadence_stopped?: Nullable<boolean>;
     cadence_completed?: Nullable<boolean>;
-    cadence_progress: CadenceProgress[];
+    cadence_progress?: Nullable<Nullable<CadenceProgress>[]>;
 }
 
 export interface CadenceTemplate {

@@ -16,8 +16,9 @@ import { TriggerCallService } from '../call/trigger-call.service';
 export class CampaignsService {
   private queue: Queue;
 
-  constructor(private readonly prisma: PrismaService,
-    private readonly triggerCallService: TriggerCallService
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly triggerCallService: TriggerCallService,
   ) {
     this.queue = new Queue('campaignQueue', {
       connection: redis,
@@ -107,6 +108,7 @@ export class CampaignsService {
           },
         },
       });
+
       return {
         userError: null,
         data: campaigns,
@@ -186,8 +188,8 @@ export class CampaignsService {
         leads_count: totalCount,
         remaining: pendingCount,
         failed: failedCount,
-        completed: completedCount,        // ✅ Explicitly set completed count
-        in_progress: inProgressCount,     // ✅ Explicitly set in_progress count
+        completed: completedCount, // ✅ Explicitly set completed count
+        in_progress: inProgressCount, // ✅ Explicitly set in_progress count
         status: newStatus,
       };
 
@@ -229,31 +231,31 @@ export class CampaignsService {
           campaign_id: campaignId,
           OR: searchTerm
             ? [
-              {
-                name: {
-                  contains: searchTerm,
-                  mode: 'insensitive',
+                {
+                  name: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
                 },
-              },
-              {
-                phone_number: {
-                  contains: searchTerm,
-                  mode: 'insensitive',
+                {
+                  phone_number: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
                 },
-              },
-              {
-                status: {
-                  contains: searchTerm,
-                  mode: 'insensitive',
+                {
+                  status: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
                 },
-              },
-              {
-                disposition: {
-                  contains: searchTerm,
-                  mode: 'insensitive',
+                {
+                  disposition: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
                 },
-              },
-            ]
+              ]
             : undefined,
         },
         orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
@@ -384,22 +386,27 @@ export class CampaignsService {
     success: boolean;
   }> {
     try {
-      const [pendingCount, failedCount, completedCount, inProgressCount, totalCount] = 
-        await Promise.all([
-          this.prisma.leads.count({
-            where: { campaign_id: campaignId, status: 'Pending' },
-          }),
-          this.prisma.leads.count({
-            where: { campaign_id: campaignId, status: 'Failed' },
-          }),
-          this.prisma.leads.count({
-            where: { campaign_id: campaignId, status: 'Completed' },
-          }),
-          this.prisma.leads.count({
-            where: { campaign_id: campaignId, status: 'InProgress' },
-          }),
-          this.prisma.leads.count({ where: { campaign_id: campaignId } }),
-        ]);
+      const [
+        pendingCount,
+        failedCount,
+        completedCount,
+        inProgressCount,
+        totalCount,
+      ] = await Promise.all([
+        this.prisma.leads.count({
+          where: { campaign_id: campaignId, status: 'Pending' },
+        }),
+        this.prisma.leads.count({
+          where: { campaign_id: campaignId, status: 'Failed' },
+        }),
+        this.prisma.leads.count({
+          where: { campaign_id: campaignId, status: 'Completed' },
+        }),
+        this.prisma.leads.count({
+          where: { campaign_id: campaignId, status: 'InProgress' },
+        }),
+        this.prisma.leads.count({ where: { campaign_id: campaignId } }),
+      ]);
 
       await this.prisma.campaigns.update({
         where: { id: campaignId },
@@ -449,14 +456,24 @@ export class CampaignsService {
 
     if (allLeadsResult.userError || !allLeadsResult.data) {
       console.error('❌ No leads found or error fetching leads.');
-      return { userError: { message: "No Pending leads found or error fetching leads." }, success: false };
+      return {
+        userError: {
+          message: 'No Pending leads found or error fetching leads.',
+        },
+        success: false,
+      };
     }
 
     const pendingLeads = allLeadsResult.data;
 
     if (pendingLeads.length === 0) {
       await this.updateCampaignStatus(campaignId, 'idle');
-      return { userError: { message: "No Pending leads found or error fetching leads." }, success: false };
+      return {
+        userError: {
+          message: 'No Pending leads found or error fetching leads.',
+        },
+        success: false,
+      };
     }
 
     await this.updateCampaignStatus(campaignId, 'executing');
@@ -491,7 +508,6 @@ export class CampaignsService {
     }
 
     await this.updateCampaignStatus(campaignId, 'idle');
-
 
     return { userError: null, success: true };
   }
@@ -674,50 +690,51 @@ export class CampaignsService {
         include: {
           activity_logs: {
             where: { activity_type: ActivityType.CALL_ATTEMPT },
-            orderBy: { created_at: "asc" }
-          }
-        }
+            orderBy: { created_at: 'asc' },
+          },
+        },
       });
 
       // Flatten into one row per attempt or one row if no attempts
       const rows = leads.flatMap((lead) => {
         if (lead.activity_logs.length === 0) {
           // No activity logs, return a single row with lead data and attempt 0
-          return [{
-            name: lead.name || "",
-            phone: lead.phone_number || "",
-            status: lead.status || "",
-            disposition: lead.disposition || "",
-            duration: "0 sec",
-            cost: lead.cost ?? 0.0,
-            attempt: 0
-          }];
+          return [
+            {
+              name: lead.name || '',
+              phone: lead.phone_number || '',
+              status: lead.status || '',
+              disposition: lead.disposition || '',
+              duration: '0 sec',
+              cost: lead.cost ?? 0.0,
+              attempt: 0,
+            },
+          ];
         }
 
         // Otherwise return rows for each activity log
         return lead.activity_logs.map((log, index) => ({
-          name: lead.name || "",
-          phone: lead.phone_number || "",
-          status: log.lead_status || "",
-          disposition: log.to_disposition || "",
-          duration: log.duration ? `${log.duration} sec` : "0 sec",
+          name: lead.name || '',
+          phone: lead.phone_number || '',
+          status: log.lead_status || '',
+          disposition: log.to_disposition || '',
+          duration: log.duration ? `${log.duration} sec` : '0 sec',
           cost: log.cost ?? 0.0,
-          attempt: index + 1
+          attempt: index + 1,
         }));
       });
 
       console.log({ rows });
       return {
         userError: null,
-        data: rows
+        data: rows,
       };
     } catch (error) {
-      console.error("Error fetching lead attempts:", error);
+      console.error('Error fetching lead attempts:', error);
       return {
-        userError: { message: "Failed to fetch lead attempts" },
-        data: []
+        userError: { message: 'Failed to fetch lead attempts' },
+        data: [],
       };
     }
   }
-
 }

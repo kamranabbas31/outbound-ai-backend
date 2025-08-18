@@ -25,7 +25,7 @@ type Campaign {
   cadence_start_date: DateTime
   cadence_stopped: Boolean
   cadence_completed: Boolean
-  cadence_progress: [CadenceProgress!]!
+  cadence_progress: [CadenceProgress]
 }
 
 type Lead {
@@ -163,7 +163,6 @@ type Query {
     itemsPerPage: Int
   ): CampaignLeadPaginationResult!
   fetchLeadAttempts(campaignId: String!): LeadAttemptListResponse!
-
 }
 
 type Mutation {
