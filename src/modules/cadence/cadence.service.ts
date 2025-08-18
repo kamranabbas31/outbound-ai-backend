@@ -23,7 +23,7 @@ export class CadenceService {
     });
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
 

@@ -109,7 +109,7 @@ export class DashboardService {
           },
         });
 
-        if (logs.length) {
+        if (logs.length > 0) {
           // === Existing Logic ===
           const leadIds = [...new Set(logs.map((l) => l.lead_id))];
 
