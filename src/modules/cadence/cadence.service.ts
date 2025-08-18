@@ -74,10 +74,8 @@ export class CadenceService {
       const ageInHours =
         (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
       const ageInDays = ageInHours / 24;
-      const ageDay = Math.floor(ageInDays); // Convert to integer for day lookup
-      if (ageDay == 0) {
-        ageDay + 1;
-      }
+      const ageDay = Math.floor(ageInDays) + 1; // Convert to integer for day lookup
+
       this.logger.log(
         `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
       );
@@ -163,10 +161,8 @@ export class CadenceService {
       const ageInHours =
         (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
       const ageInDays = ageInHours / 24;
-      const age = Math.floor(ageInDays);
-      if (age == 0) {
-        age + 1;
-      } // Convert to integer for day lookup, add 1 for 1-based indexing
+      const age = Math.floor(ageInDays) + 1;
+      // Convert to integer for day lookup, add 1 for 1-based indexing
       console.log(
         '[INFO] age (days since created):',
         age,
