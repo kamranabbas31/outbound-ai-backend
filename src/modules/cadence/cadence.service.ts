@@ -161,7 +161,7 @@ export class CadenceService {
       const ageInHours =
         (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
       const ageInDays = ageInHours / 24;
-      const age = Math.floor(ageInDays) + 1; // Convert to integer for day lookup, add 1 for 1-based indexing
+      const age = Math.floor(ageInDays); // Convert to integer for day lookup, add 1 for 1-based indexing
       console.log(
         '[INFO] age (days since created):',
         age,
