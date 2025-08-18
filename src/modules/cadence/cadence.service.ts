@@ -12,17 +12,18 @@ import { isNowInTimeWindow } from 'src/utils/helper';
 export class CadenceService {
   private readonly logger = new Logger(CadenceService.name);
   private cadenceQueue: Queue;
+  private readonly QUEUE_NAME = 'cadence-queue';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly triggerCallService: TriggerCallService,
   ) {
-    this.cadenceQueue = new Queue('cadenceQueue', {
+    this.cadenceQueue = new Queue(this.QUEUE_NAME, {
       connection: redisConfig,
     });
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
 
@@ -95,7 +96,7 @@ export class CadenceService {
       }
 
       // Step 4: Queue it
-      await this.cadenceQueue.add('cadence-queue', {
+      await this.cadenceQueue.add('execute-cadence', {
         campaignId: campaign.id,
       });
 

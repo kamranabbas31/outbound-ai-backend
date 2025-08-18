@@ -1,0 +1,13 @@
+# Redis Configuration (Upstash Redis)
+REDIS_HOST=your-upstash-redis-host.upstash.io
+REDIS_PASSWORD=your-upstash-redis-password
+
+# Database Configuration
+DATABASE_URL="postgresql://username:password@localhost:5432/database_name"
+
+# JWT Configuration
+JWT_SECRET=your-jwt-secret-key
+
+# Other Configuration
+NODE_ENV=development
+PORT=3000
