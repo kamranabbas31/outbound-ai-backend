@@ -1,6 +1,6 @@
 export function isNowInTimeWindow(window: string): boolean {
   const [startStr, endStr] = window.split('-');
-  const now = new Date();
+  const now = getNowInEST();
 
   // Parse start time
   const startTime = parseTimeString(startStr);
@@ -50,4 +50,14 @@ function parseTimeString(timeStr: string): { hours: number; minutes: number } {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return { hours, minutes };
   }
+}
+function getNowInEST(): Date {
+  // Create a date in UTC
+  const now = new Date();
+
+  // Convert UTC to EST (America/New_York, handles DST automatically)
+  const estString = now.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+  });
+  return new Date(estString);
 }
