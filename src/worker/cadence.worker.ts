@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { CadenceService } from 'src/modules/cadence/cadence.service';
-import { redis } from 'src/utils/redis';
+import { redisConfig } from 'src/utils/redis';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -27,7 +27,7 @@ async function bootstrapCadenceWorker() {
       }
     },
     {
-      connection: redis,
+      connection: redisConfig,
     },
   );
 

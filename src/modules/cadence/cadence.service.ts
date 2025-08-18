@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { differenceInCalendarDays } from 'date-fns';
 import { TriggerCallService } from '../call/trigger-call.service';
 import { Queue } from 'bullmq';
-import { redis } from 'src/utils/redis';
+import { redisConfig } from 'src/utils/redis';
 import { isNowInTimeWindow } from 'src/utils/helper';
 
 @Injectable()
@@ -18,14 +18,14 @@ export class CadenceService {
     private readonly triggerCallService: TriggerCallService,
   ) {
     this.cadenceQueue = new Queue('cadenceQueue', {
-      connection: redis,
+      connection: redisConfig,
     });
   }
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
-  
+
     // Step 1: Get campaigns that are *potentially* eligible
     const campaigns = await this.prisma.campaigns.findMany({
       where: {
@@ -45,33 +45,39 @@ export class CadenceService {
         },
       },
     });
-  
+
     if (campaigns.length === 0) {
       this.logger.log('No campaigns eligible for cadence execution.');
       return;
     }
-  
+
     let queuedCount = 0;
-  
+
     // Step 2: Filter campaigns where today is in cadence config & attempts not exhausted
     for (const campaign of campaigns) {
       const baseDate = campaign.cadence_start_date;
-      const cadenceDays = campaign.cadence_template
-        ?.cadence_days as Record<string, { attempts: number; time_windows: string[] }>;
-  
+      const cadenceDays = campaign.cadence_template?.cadence_days as Record<
+        string,
+        { attempts: number; time_windows: string[] }
+      >;
+
       if (!baseDate || !cadenceDays) {
-        this.logger.log(`[SKIP] Campaign ${campaign.id}: Missing baseDate or cadence config`);
+        this.logger.log(
+          `[SKIP] Campaign ${campaign.id}: Missing baseDate or cadence config`,
+        );
         continue;
       }
-  
+
       const age = differenceInCalendarDays(new Date(), baseDate) + 1;
       const dayConfig = cadenceDays[age.toString()];
-  
+
       if (!dayConfig) {
-        this.logger.log(`[SKIP] Campaign ${campaign.id}: No config for day ${age}`);
+        this.logger.log(
+          `[SKIP] Campaign ${campaign.id}: No config for day ${age}`,
+        );
         continue;
       }
-  
+
       // Step 3: Check if today's attempts are already done
       const attemptsDoneToday = await this.prisma.cadenceProgress.count({
         where: {
@@ -80,22 +86,22 @@ export class CadenceService {
           day: age,
         },
       });
-  
+
       if (attemptsDoneToday >= dayConfig.attempts) {
         this.logger.log(
-          `[SKIP] Campaign ${campaign.id}: Max attempts (${dayConfig.attempts}) already done today.`
+          `[SKIP] Campaign ${campaign.id}: Max attempts (${dayConfig.attempts}) already done today.`,
         );
         continue;
       }
-  
+
       // Step 4: Queue it
       await this.cadenceQueue.add('cadence-queue', {
         campaignId: campaign.id,
       });
-  
+
       queuedCount++;
     }
-  
+
     this.logger.log(`Cadence jobs queued: ${queuedCount}`);
   }
 
@@ -103,7 +109,9 @@ export class CadenceService {
     campaignId: string,
   ): Promise<'completed' | void> {
     try {
-      console.log("[START] executeCampaignCadence called with:", { campaignId });
+      console.log('[START] executeCampaignCadence called with:', {
+        campaignId,
+      });
 
       const campaign = await this.prisma.campaigns.findUnique({
         where: { id: campaignId },
@@ -111,24 +119,24 @@ export class CadenceService {
           cadence_template: true,
         },
       });
-      console.log("[DB] campaign fetched:", campaign);
+      console.log('[DB] campaign fetched:', campaign);
 
       if (!campaign?.cadence_template) {
-        console.log("[INFO] No cadence_template found. Exiting...");
+        console.log('[INFO] No cadence_template found. Exiting...');
         return;
       }
 
       const { cadence_template } = campaign;
-      console.log("[INFO] cadence_template:", cadence_template);
+      console.log('[INFO] cadence_template:', cadence_template);
 
       const cadenceDays = cadence_template.cadence_days as Record<
         string,
         { attempts: number; time_windows: string[] }
       >;
-      console.log("[INFO] cadenceDays:", cadenceDays);
+      console.log('[INFO] cadenceDays:', cadenceDays);
 
       const retryDispositions = cadence_template.retry_dispositions;
-      console.log("[INFO] retryDispositions:", retryDispositions);
+      console.log('[INFO] retryDispositions:', retryDispositions);
 
       const cadenceProgressCount = await this.prisma.cadenceProgress.count({
         where: {
@@ -136,10 +144,10 @@ export class CadenceService {
           cadence_id: cadence_template.id,
         },
       });
-      console.log("[DB] cadenceProgressCount:", cadenceProgressCount);
+      console.log('[DB] cadenceProgressCount:', cadenceProgressCount);
 
       const isFirstCadenceExecution = cadenceProgressCount === 0;
-      console.log("[INFO] isFirstCadenceExecution:", isFirstCadenceExecution);
+      console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
 
       const leads = await this.prisma.leads.findMany({
         where: {
@@ -149,34 +157,34 @@ export class CadenceService {
             : { disposition: { in: retryDispositions } }),
         },
       });
-      console.log("[DB] leads fetched:", leads);
+      console.log('[DB] leads fetched:', leads);
 
       let hasRetried = false;
       if (leads.length === 0) {
-        console.log("[STOP] No leads found for this cadence run. Exiting...");
+        console.log('[STOP] No leads found for this cadence run. Exiting...');
         return;
       }
 
       const baseDate = campaign.cadence_start_date;
-      console.log("[INFO] baseDate:", baseDate);
+      console.log('[INFO] baseDate:', baseDate);
       if (!baseDate) {
-        console.log("[SKIP] NO Cadence has started today");
+        console.log('[SKIP] NO Cadence has started today');
         return;
       }
 
       const age = differenceInCalendarDays(new Date(), new Date(baseDate)) + 1;
-      console.log("[INFO] age (days since created):", age);
+      console.log('[INFO] age (days since created):', age);
 
       const dayConfig = cadenceDays[age.toString()];
-      console.log("[INFO] dayConfig for age:", dayConfig);
+      console.log('[INFO] dayConfig for age:', dayConfig);
       if (!dayConfig) {
-        console.log("[SKIP] No cadence config for today.");
+        console.log('[SKIP] No cadence config for today.');
         return;
       }
 
       const { attempts: maxAttempts, time_windows } = dayConfig;
-      console.log("[INFO] maxAttempts:", maxAttempts);
-      console.log("[INFO] time_windows:", time_windows);
+      console.log('[INFO] maxAttempts:', maxAttempts);
+      console.log('[INFO] time_windows:', time_windows);
 
       const attemptsDoneToday = await this.prisma.cadenceProgress.count({
         where: {
@@ -184,24 +192,22 @@ export class CadenceService {
           cadence_id: cadence_template.id,
           day: age,
         },
-
       });
 
-
       if (attemptsDoneToday >= maxAttempts) {
-        console.log("[SKIP] Max attempts reached for today.");
+        console.log('[SKIP] Max attempts reached for today.');
         return;
       }
 
       const baseAttemptsPerSlot = Math.floor(maxAttempts / time_windows.length);
       const extraAttempts = maxAttempts % time_windows.length;
-      console.log("[INFO] baseAttemptsPerSlot:", baseAttemptsPerSlot);
-      console.log("[INFO] extraAttempts:", extraAttempts);
+      console.log('[INFO] baseAttemptsPerSlot:', baseAttemptsPerSlot);
+      console.log('[INFO] extraAttempts:', extraAttempts);
 
       const attemptDistribution = time_windows.map((_, index) =>
         index < extraAttempts ? baseAttemptsPerSlot + 1 : baseAttemptsPerSlot,
       );
-      console.log("[INFO] attemptDistribution:", attemptDistribution);
+      console.log('[INFO] attemptDistribution:', attemptDistribution);
 
       let assignedSlot = -1;
       for (let i = 0; i < time_windows.length; i++) {
@@ -213,19 +219,21 @@ export class CadenceService {
 
         const slotMaxAttempts = attemptDistribution[i];
         if (attemptsDoneToday >= slotMaxAttempts) {
-          console.log(`[SKIP] Enough attempts  reached for time window ${time_windows[i]}`);
+          console.log(
+            `[SKIP] Enough attempts  reached for time window ${time_windows[i]}`,
+          );
           continue;
         }
 
-
-
         assignedSlot = i;
-        console.log("[INFO] assignedSlot:", assignedSlot);
+        console.log('[INFO] assignedSlot:', assignedSlot);
         break;
       }
 
       if (assignedSlot === -1) {
-        console.log("[SKIP] All time slots filled or not in current time window.");
+        console.log(
+          '[SKIP] All time slots filled or not in current time window.',
+        );
         return;
       }
 
@@ -235,15 +243,15 @@ export class CadenceService {
           cadence_id: cadence_template.id,
         },
       });
-      console.log("[DB] isFirstEverAttempt record:", isFirstEverAttempt);
+      console.log('[DB] isFirstEverAttempt record:', isFirstEverAttempt);
 
       for (const lead of leads) {
-        console.log("\n[LOOP] Processing lead:", lead);
+        console.log('\n[LOOP] Processing lead:', lead);
         if (isFirstEverAttempt) {
-          console.log("[ACTION] Triggering normal call...");
+          console.log('[ACTION] Triggering normal call...');
           await this.triggerCallService.triggerCall({ leadId: lead.id });
         } else {
-          console.log("[ACTION] Triggering cadence call...");
+          console.log('[ACTION] Triggering cadence call...');
           await this.triggerCallService.triggerCallForCadence(lead);
         }
 
@@ -258,50 +266,55 @@ export class CadenceService {
           time_window: time_windows[assignedSlot],
         },
       });
-      console.log("[DB] cadenceProgress created:", newProgress);
+      console.log('[DB] cadenceProgress created:', newProgress);
       if (!hasRetried) {
         const lastCadenceDay = Math.max(
           ...Object.keys(cadenceDays).map((k) => parseInt(k)),
         );
-        console.log("[INFO] lastCadenceDay:", lastCadenceDay);
+        console.log('[INFO] lastCadenceDay:', lastCadenceDay);
 
         const leadsInCampaign = await this.prisma.leads.count({
           where: { campaign_id: campaignId },
         });
-        console.log("[DB] leadsInCampaign:", leadsInCampaign);
+        console.log('[DB] leadsInCampaign:', leadsInCampaign);
 
-        const totalAttemptsOnLastDay = await this.prisma.cadenceProgress.findFirst({
-          where: {
-            campaign_id: campaignId,
-            cadence_id: cadence_template.id,
-            day: lastCadenceDay,
-          },
-          orderBy: { executed_at: "desc" },
-          select: { attempt: true }
-        });
-        console.log("[DB] totalAttemptsOnLastDay:", totalAttemptsOnLastDay);
+        const totalAttemptsOnLastDay =
+          await this.prisma.cadenceProgress.findFirst({
+            where: {
+              campaign_id: campaignId,
+              cadence_id: cadence_template.id,
+              day: lastCadenceDay,
+            },
+            orderBy: { executed_at: 'desc' },
+            select: { attempt: true },
+          });
+        console.log('[DB] totalAttemptsOnLastDay:', totalAttemptsOnLastDay);
 
-        if (totalAttemptsOnLastDay?.attempt ?? 0 >= cadenceDays[lastCadenceDay].attempts) {
+        if (
+          totalAttemptsOnLastDay?.attempt ??
+          0 >= cadenceDays[lastCadenceDay].attempts
+        ) {
           const updatedCampaign = await this.prisma.campaigns.update({
             where: { id: campaignId },
             data: { cadence_completed: true },
           });
-          console.log("[DB] Campaign marked completed:", updatedCampaign);
+          console.log('[DB] Campaign marked completed:', updatedCampaign);
 
           this.logger.log(`[CADENCE COMPLETED] Campaign ${campaignId}`);
           return 'completed';
         }
       }
 
-      console.log("[END] executeCampaignCadence completed.");
+      console.log('[END] executeCampaignCadence completed.');
     } catch (error) {
-      console.error("[ERROR] executeCampaignCadence failed:", error);
-      this.logger.error(`Error executing cadence for campaign ${campaignId}:`, error);
+      console.error('[ERROR] executeCampaignCadence failed:', error);
+      this.logger.error(
+        `Error executing cadence for campaign ${campaignId}:`,
+        error,
+      );
       throw error;
     }
   }
-
-
 
   async createCadenceTemplate(input: {
     name: string;
@@ -378,9 +391,9 @@ export class CadenceService {
     // 🔒 If updating name, check if another cadence with the same name already exists
     if (name && name !== existing.name) {
       const nameConflict = await this.prisma.cadenceTemplate.findFirst({
-        where: { 
+        where: {
           name,
-          id: { not: id } // Exclude current template from check
+          id: { not: id }, // Exclude current template from check
         },
       });
 
@@ -391,15 +404,15 @@ export class CadenceService {
 
     // 🧱 Build the update data object
     const updateData: any = {};
-    
+
     if (name !== undefined) {
       updateData.name = name;
     }
-    
+
     if (retry_dispositions !== undefined) {
       updateData.retry_dispositions = retry_dispositions;
     }
-    
+
     if (cadence_days !== undefined) {
       // Build the JSON cadence_days map
       const cadenceMap: Record<
@@ -495,7 +508,7 @@ export class CadenceService {
       });
 
       if (attachedCampaigns.length > 0) {
-        const campaignNames = attachedCampaigns.map(c => c.name).join(', ');
+        const campaignNames = attachedCampaigns.map((c) => c.name).join(', ');
         return {
           userError: {
             message: `The following campaign(s) are attached to this cadence: ${campaignNames}. Please unlink them first to delete.`,
@@ -517,6 +530,4 @@ export class CadenceService {
       };
     }
   }
-
-  
 }
