@@ -86,6 +86,7 @@ export class DashboardService {
 
         for (const lead of leads) {
           const status = lead.status?.toLowerCase();
+          console.log({ status });
           switch (status) {
             case 'completed':
               completed++;
@@ -141,7 +142,7 @@ export class DashboardService {
           `[DashboardService] Found ${logs.length} activity logs for cadence campaigns`,
         );
 
-        if (logs.length) {
+        if (logs.length > 0) {
           // === Existing Logic ===
           const leadIds = [...new Set(logs.map((l) => l.lead_id))];
           console.log(
@@ -211,6 +212,8 @@ export class DashboardService {
 
           for (const lead of leads) {
             const status = lead.status?.toLowerCase();
+            console.log({ status });
+
             switch (status) {
               case 'completed':
                 completed++;
