@@ -139,33 +139,6 @@ export class CadenceService {
       const retryDispositions = cadence_template.retry_dispositions;
       console.log('[INFO] retryDispositions:', retryDispositions);
 
-      const cadenceProgressCount = await this.prisma.cadenceProgress.count({
-        where: {
-          campaign_id: campaignId,
-          cadence_id: cadence_template.id,
-        },
-      });
-      console.log('[DB] cadenceProgressCount:', cadenceProgressCount);
-
-      const isFirstCadenceExecution = cadenceProgressCount === 0;
-      console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
-
-      const leads = await this.prisma.leads.findMany({
-        where: {
-          campaign_id: campaignId,
-          ...(isFirstCadenceExecution
-            ? { status: 'Pending' }
-            : { disposition: { in: retryDispositions } }),
-        },
-      });
-      console.log('[DB] leads fetched:', leads);
-
-      let hasRetried = false;
-      if (leads.length === 0) {
-        console.log('[STOP] No leads found for this cadence run. Exiting...');
-        return;
-      }
-
       const baseDate = campaign.cadence_start_date;
       console.log('[INFO] baseDate:', baseDate);
       if (!baseDate) {
@@ -237,18 +210,36 @@ export class CadenceService {
         );
         return;
       }
-
-      const isFirstEverAttempt = await this.prisma.cadenceProgress.findFirst({
+      const cadenceProgressCount = await this.prisma.cadenceProgress.count({
         where: {
           campaign_id: campaignId,
           cadence_id: cadence_template.id,
         },
       });
-      console.log('[DB] isFirstEverAttempt record:', isFirstEverAttempt);
+      console.log('[DB] cadenceProgressCount:', cadenceProgressCount);
+
+      const isFirstCadenceExecution = cadenceProgressCount === 0;
+      console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
+
+      const leads = await this.prisma.leads.findMany({
+        where: {
+          campaign_id: campaignId,
+          ...(isFirstCadenceExecution
+            ? { status: 'Pending' }
+            : { disposition: { in: retryDispositions } }),
+        },
+      });
+      console.log('[DB] leads fetched:', leads);
+
+      let hasRetried = false;
+      if (leads.length === 0) {
+        console.log('[STOP] No leads found for this cadence run. Exiting...');
+        return;
+      }
 
       for (const lead of leads) {
         console.log('\n[LOOP] Processing lead:', lead);
-        if (isFirstEverAttempt) {
+        if (isFirstCadenceExecution) {
           console.log('[ACTION] Triggering normal call...');
           await this.triggerCallService.triggerCall({ leadId: lead.id });
         } else {

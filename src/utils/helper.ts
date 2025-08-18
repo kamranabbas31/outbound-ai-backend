@@ -8,6 +8,7 @@ export function isNowInTimeWindow(window: string): boolean {
 
   // Create Date objects for today with the parsed times
   const start = new Date(now);
+  console.log({ start });
   start.setHours(startTime.hours, startTime.minutes, 0, 0);
 
   const end = new Date(now);
