@@ -406,9 +406,12 @@ export function extractDisposition(payload: any): string {
     endReason?.toLowerCase().includes('customer did not answer') ||
     endReason?.toLowerCase().includes('customer-did-not-answer') ||
     endReason?.toLowerCase().includes('twilio failed connection') ||
+    endReason?.toLowerCase().includes('twilio-failed-connection') ||
     endReason?.toLowerCase().includes('no-answer') ||
     endReason?.toLowerCase().includes('no_answer') ||
-    endReason?.toLowerCase().includes('timeout')
+    endReason?.toLowerCase().includes('timeout') ||
+    endReason?.toLowerCase().includes('time out') ||
+    endReason?.toLowerCase().includes('unanswered')
   ) {
     console.log('DISPOSITION: No Answer detected');
     return 'No Answer';
@@ -485,6 +488,8 @@ export function extractDisposition(payload: any): string {
     lowerContent.includes('no green card') ||
     lowerContent.includes('currently enrolled in school') ||
     lowerContent.includes('currently enrolled in college') ||
+    lowerContent.includes('already in school') ||
+    lowerContent.includes('already in college') ||
     lowerContent.includes('still in school') ||
     lowerContent.includes('still in college')
   ) {
@@ -499,10 +504,27 @@ export function extractDisposition(payload: any): string {
     lowerContent.includes('not looking') ||
     lowerContent.includes('not for me') ||
     lowerContent.includes("don't want") ||
-    lowerContent.includes('no interest')
+    lowerContent.includes('no interest') ||
+    lowerContent.includes('do not want') ||
+    lowerContent.includes('no thank you') ||
+    lowerContent.includes('not ready')
   ) {
     console.log('DISPOSITION: Not Interested detected');
     return 'Not Interested';
+  }
+  if (
+    lowerContent.includes('call me later') ||
+    lowerContent.includes('call back later') ||
+    lowerContent.includes('please call me back') ||
+    lowerContent.includes('can you call me back') ||
+    lowerContent.includes('try again later') ||
+    lowerContent.includes('reach me later') ||
+    lowerContent.includes('busy right now') ||
+    lowerContent.includes('not a good time') ||
+    lowerContent.includes('call tomorrow') ||
+    lowerContent.includes("i'll be free later")
+  ) {
+    return 'Call Back Requested';
   }
   // Check for Hang Up based on end reason
   if (
@@ -519,8 +541,29 @@ export function extractDisposition(payload: any): string {
   // Default fallback with more context
   console.log('DISPOSITION: Using fallback logic');
   if (endReason) {
-    console.log('DISPOSITION: Other with end reason:', endReason);
-    return endReason;
+    const reason = endReason.toLowerCase();
+    if (
+      reason.includes('user_hung_up') ||
+      reason.includes('hangup') ||
+      reason.includes('hang_up') ||
+      reason.includes('disconnected') ||
+      reason.includes('assistant-ended-call')
+    ) {
+      return 'Hang Up';
+    }
+    if (
+      reason.includes('busy') ||
+      reason.includes('timeout') ||
+      reason.includes('failed') ||
+      reason.includes('error') ||
+      reason.includes('did-not-answer') ||
+      reason.includes('customer-did-not-answer')
+    ) {
+      return 'No Answer';
+    }
+    if (reason.includes('voicemail')) {
+      return 'Answering Machine';
+    }
   }
   console.log('DISPOSITION: Unknown (no end reason found)');
   return 'Unknown';
