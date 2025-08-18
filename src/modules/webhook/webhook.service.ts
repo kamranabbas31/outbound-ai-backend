@@ -207,10 +207,27 @@ export class WebhookService {
             actualCompleted -
             actualInProgress -
             actualFailed;
+          // Update campaign status based on lead distribution
+          let campaignStatus: string;
+
+          if (actualCompleted === campaignStats.leads_count) {
+            // All leads are completed
+            campaignStatus = 'Completed';
+          } else if (actualFailed === campaignStats.leads_count) {
+            // All leads have failed
+            campaignStatus = 'Failed';
+          } else if (actualInProgress > 0) {
+            // Some leads are still in progress
+            campaignStatus = 'InProgress';
+          } else {
+            // Default to 'In Progress' if there are remaining leads
+            campaignStatus = 'InProgress';
+          }
 
           await tx.campaigns.update({
             where: { id: campaignId },
             data: {
+              status: campaignStatus,
               completed: actualCompleted,
               in_progress: actualInProgress,
               failed: actualFailed,
