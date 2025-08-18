@@ -23,7 +23,7 @@ export class CadenceService {
     });
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
 
@@ -69,12 +69,22 @@ export class CadenceService {
         continue;
       }
 
-      const age = differenceInCalendarDays(new Date(), baseDate) + 1;
-      const dayConfig = cadenceDays[age.toString()];
+      // Calculate age with hours precision
+      const now = new Date();
+      const ageInHours =
+        (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
+      const ageInDays = ageInHours / 24;
+      const ageDay = Math.floor(ageInDays); // Convert to integer for day lookup
+
+      this.logger.log(
+        `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
+      );
+
+      const dayConfig = cadenceDays[ageDay.toString()];
 
       if (!dayConfig) {
         this.logger.log(
-          `[SKIP] Campaign ${campaign.id}: No config for day ${age}`,
+          `[SKIP] Campaign ${campaign.id}: No config for day ${ageDay}`,
         );
         continue;
       }
@@ -84,7 +94,7 @@ export class CadenceService {
         where: {
           campaign_id: campaign.id,
           cadence_id: campaign?.cadence_template?.id,
-          day: age,
+          day: ageDay,
         },
       });
 
@@ -146,8 +156,17 @@ export class CadenceService {
         return;
       }
 
-      const age = differenceInCalendarDays(new Date(), new Date(baseDate)) + 1;
-      console.log('[INFO] age (days since created):', age);
+      // Calculate age with hours precision
+      const now = new Date();
+      const ageInHours =
+        (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
+      const ageInDays = ageInHours / 24;
+      const age = Math.floor(ageInDays) + 1; // Convert to integer for day lookup, add 1 for 1-based indexing
+      console.log(
+        '[INFO] age (days since created):',
+        age,
+        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours)`,
+      );
 
       const dayConfig = cadenceDays[age.toString()];
       console.log('[INFO] dayConfig for age:', dayConfig);
