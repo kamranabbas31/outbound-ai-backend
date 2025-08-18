@@ -9,24 +9,21 @@ dotenv.config();
 async function bootstrapCadenceWorker() {
   try {
     console.log('Starting cadence worker...');
-    console.log('Redis config:', {
-      host: process.env.REDIS_HOST,
-      port: 6379,
-      tls: true,
-    });
+
+    // ✅ Print the actual redisConfig (not hardcoded)
+    console.log('Redis config (BullMQ):', redisConfig);
+
+    // ✅ Print the connection string alternative
+    const connectionString = getRedisUrl();
+    console.log('Redis connection string:', connectionString);
 
     const app = await NestFactory.createApplicationContext(AppModule);
     const cadenceService = app.get(CadenceService);
-
-    // Use connection string format for better compatibility with Upstash Redis
-    const connectionString = getRedisUrl();
-    console.log('Using Redis connection:', connectionString);
 
     const worker = new Worker(
       'cadence-queue',
       async (job) => {
         const { campaignId } = job.data;
-
         console.log(`Processing cadence for campaign ${campaignId}`);
 
         try {
@@ -39,8 +36,10 @@ async function bootstrapCadenceWorker() {
         }
       },
       {
+        // ✅ Use redisConfig (6380 + TLS)
         connection: redisConfig,
-        // Alternative: use connection string
+
+        // Alternative: use connection string instead
         // connection: connectionString,
       },
     );
