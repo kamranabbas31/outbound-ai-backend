@@ -6,7 +6,9 @@ export const redis = new Redis({
   port: 6380, // ✅ Upstash TLS port
   username: 'default', // ✅ Upstash requires "default"
   password: process.env.REDIS_PASSWORD,
-  tls: {}, // ✅ enable TLS
+  tls: {
+    rejectUnauthorized: false,
+  }, // ✅ enable TLS
   maxRetriesPerRequest: null,
 });
 
@@ -16,7 +18,7 @@ export const redisConfig: RedisOptions = {
   port: 6380, // ✅ TLS port
   username: 'default',
   password: process.env.REDIS_PASSWORD,
-  tls: {}, // ✅ TLS
+  tls: { rejectUnauthorized: false }, // ✅ TLS
   maxRetriesPerRequest: null,
   lazyConnect: true,
 };
