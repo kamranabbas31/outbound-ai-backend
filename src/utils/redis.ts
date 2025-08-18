@@ -1,33 +1,34 @@
 import { Redis, RedisOptions } from 'ioredis';
 import { ConnectionOptions } from 'tls';
 
-// For ioredis direct usage
+// Direct ioredis client (useful for Pub/Sub or manual Redis ops)
 export const redis = new Redis({
   host: process.env.REDIS_HOST,
-  port: 6379,
+  port: 6380, // ✅ Upstash TLS port
   password: process.env.REDIS_PASSWORD,
-  tls: { rejectUnauthorized: false } as ConnectionOptions,
+  tls: {} as ConnectionOptions, // ✅ enable TLS (don’t need rejectUnauthorized override for Upstash)
   maxRetriesPerRequest: null,
 });
 
-// For bullmq connection - this needs to be a plain object, not an ioredis instance
+// For BullMQ connection - use plain RedisOptions object
 export const redisConfig: RedisOptions = {
   host: process.env.REDIS_HOST,
-  port: 6379,
+  port: 6380, // ✅ Upstash TLS port
   password: process.env.REDIS_PASSWORD,
-  tls: { rejectUnauthorized: false },
+  tls: {} as ConnectionOptions, // ✅ Upstash requires TLS
   maxRetriesPerRequest: null,
   lazyConnect: true,
 };
 
-// Alternative connection string format for Upstash Redis
+// Alternative connection string format for Upstash Redis (recommended)
 export const getRedisUrl = (): string => {
   const host = process.env.REDIS_HOST;
   const password = process.env.REDIS_PASSWORD;
-  const port = 6379;
+  const port = 6380; // ✅ TLS port
 
   if (host && password) {
-    return `rediss://:${password}@${host}:${port}`;
+    return `rediss://default:${password}@${host}:${port}`;
+    // "default" is the fixed username for Upstash
   }
   return `redis://${host}:${port}`;
 };
