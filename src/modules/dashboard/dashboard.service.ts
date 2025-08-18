@@ -66,35 +66,63 @@ export class DashboardService {
       let totalDuration = 0;
       let totalCost = 0;
 
-      // 2️⃣ Non-cadence → read campaign statuses directly from database
-      if (nonCadenceCampaignIds.length) {
-        const nonCadenceCampaigns = await this.prisma.campaigns.findMany({
+      // 2️⃣ Non-cadence → fetch leads and calculate from lead data
+      if (nonCadenceCampaignIds.length > 0 && start && end) {
+        console.log(
+          `[DashboardService] Processing ${nonCadenceCampaignIds.length} non-cadence campaigns`,
+        );
+
+        const leads = await this.prisma.leads.findMany({
           where: {
-            id: { in: nonCadenceCampaignIds },
+            campaign_id: { in: nonCadenceCampaignIds },
             created_at: { gte: start, lte: end },
           },
-          select: {
-            completed: true,
-            in_progress: true,
-            remaining: true,
-            failed: true,
-            duration: true,
-            cost: true,
-          },
+          select: { status: true, duration: true, cost: true },
         });
 
-        for (const campaign of nonCadenceCampaigns) {
-          completed += campaign.completed ?? 0;
-          inProgress += campaign.in_progress ?? 0;
-          remaining += campaign.remaining ?? 0;
-          failed += campaign.failed ?? 0;
-          totalDuration += campaign.duration ?? 0;
-          totalCost += campaign.cost ?? 0;
+        console.log(
+          `[DashboardService] Found ${leads.length} leads for non-cadence campaigns`,
+        );
+
+        for (const lead of leads) {
+          const status = lead.status?.toLowerCase();
+          switch (status) {
+            case 'completed':
+              completed++;
+              break;
+            case 'in_progress':
+              inProgress++;
+              break;
+            case 'in progress':
+              inProgress++;
+              break;
+            case 'failed':
+              failed++;
+              break;
+            default:
+              remaining++;
+              break;
+          }
+          totalDuration += lead.duration ?? 0;
+          totalCost += lead.cost ?? 0;
         }
+
+        console.log(`[DashboardService] Non-cadence stats calculated:`, {
+          completed,
+          inProgress,
+          remaining,
+          failed,
+          totalDuration,
+          totalCost,
+        });
       }
 
       // 3️⃣ Cadence → match by LeadActivityLog.created_at
-      if (cadenceCampaignIds.length) {
+      if (cadenceCampaignIds.length > 0 && start && end) {
+        console.log(
+          `[DashboardService] Processing ${cadenceCampaignIds.length} cadence campaigns`,
+        );
+
         // First, get unique lead_ids from activity logs in date range
         const logs = await this.prisma.leadActivityLog.findMany({
           where: {
@@ -109,15 +137,26 @@ export class DashboardService {
           },
         });
 
-        if (logs.length > 0) {
+        console.log(
+          `[DashboardService] Found ${logs.length} activity logs for cadence campaigns`,
+        );
+
+        if (logs.length) {
           // === Existing Logic ===
           const leadIds = [...new Set(logs.map((l) => l.lead_id))];
+          console.log(
+            `[DashboardService] Unique lead IDs from logs: ${leadIds.length}`,
+          );
 
           if (leadIds.length) {
             const leads = await this.prisma.leads.findMany({
               where: { id: { in: leadIds } },
               select: { status: true },
             });
+
+            console.log(
+              `[DashboardService] Fetched ${leads.length} leads for cadence campaigns`,
+            );
 
             for (const lead of leads) {
               const status = lead.status?.toLowerCase();
@@ -146,6 +185,15 @@ export class DashboardService {
             totalDuration += log.duration ?? 0;
             totalCost += log.cost ?? 0;
           }
+
+          console.log(`[DashboardService] Cadence stats from logs:`, {
+            completed,
+            inProgress,
+            remaining,
+            failed,
+            totalDuration,
+            totalCost,
+          });
         } else {
           // === NEW FALLBACK LOGIC ===
           console.log(
@@ -156,6 +204,10 @@ export class DashboardService {
             where: { campaign_id: { in: cadenceCampaignIds } },
             select: { status: true, duration: true, cost: true },
           });
+
+          console.log(
+            `[DashboardService] Fetched ${leads.length} leads directly for cadence campaigns`,
+          );
 
           for (const lead of leads) {
             const status = lead.status?.toLowerCase();
@@ -180,6 +232,18 @@ export class DashboardService {
             totalDuration += lead.duration ?? 0;
             totalCost += lead.cost ?? 0;
           }
+
+          console.log(
+            `[DashboardService] Cadence stats from direct lead fetch:`,
+            {
+              completed,
+              inProgress,
+              remaining,
+              failed,
+              totalDuration,
+              totalCost,
+            },
+          );
         }
       }
 
