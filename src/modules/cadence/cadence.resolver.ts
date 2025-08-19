@@ -52,4 +52,9 @@ export class CadenceResolver {
   async deleteCadenceTemplate(@Args('id') id: string) {
     return this.cadenceService.deleteCadenceTemplate(id);
   }
+
+  @Query('getCadenceProgressStats')
+  async getCadenceProgressStats(@Args('campaignId') campaignId: string) {
+    return await this.cadenceService.getCadenceProgressStats(campaignId);
+  }
 }

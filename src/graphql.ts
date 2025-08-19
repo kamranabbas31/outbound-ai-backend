@@ -130,6 +130,7 @@ export interface IQuery {
     leadActivityLogs(filter: LeadActivityLogFilterInput): LeadActivityLogResponse | Promise<LeadActivityLogResponse>;
     fetchBillingData(userId: string, start: string, end: string): BillingStatsResponse | Promise<BillingStatsResponse>;
     cadenceTemplates(): CadenceTemplatesResponse | Promise<CadenceTemplatesResponse>;
+    getCadenceProgressStats(campaignId: string): CadenceProgressStatsResponse | Promise<CadenceProgressStatsResponse>;
     fetchCampaigns(userId: string): CampaignListResponse | Promise<CampaignListResponse>;
     fetchLeadsForCampaign(campaignId: string, skip?: Nullable<number>, take?: Nullable<number>, searchTerm?: Nullable<string>): LeadListResponse | Promise<LeadListResponse>;
     fetchCampaignById(campaignId: string): CampaignResponse | Promise<CampaignResponse>;
@@ -241,6 +242,19 @@ export interface CadenceTemplatesResponse {
 export interface DeleteCadenceTemplateResponse {
     userError?: Nullable<UserError>;
     success: boolean;
+}
+
+export interface CadenceAttemptStats {
+    day: number;
+    attempt: number;
+    timeWindow: string;
+    executedAt: string;
+    completedLeads: number;
+}
+
+export interface CadenceProgressStatsResponse {
+    userError?: Nullable<UserError>;
+    data?: Nullable<CadenceAttemptStats[]>;
 }
 
 export interface TriggerCallResponse {

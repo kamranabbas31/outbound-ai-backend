@@ -264,6 +264,7 @@ export class CadenceService {
             cadence_id: cadence_template.id,
             day: age,
             time_window: timeWindow,
+            attempt: attemptsDoneToday + 1,
           },
         });
 
@@ -668,6 +669,85 @@ export class CadenceService {
       return {
         userError: { message: error.message || 'Unable to delete cadence' },
         success: false,
+      };
+    }
+  }
+
+  async getCadenceProgressStats(campaignId: string): Promise<{
+    userError: { message: string } | null;
+    data: any[] | null;
+  }> {
+    try {
+      const count = await this.prisma.cadenceProgress.count({
+        where: { campaign_id: campaignId },
+      });
+      // Get detailed cadence execution stats with completed leads per attempt
+      const cadenceStats = await this.prisma.cadenceProgress.findMany({
+        where: { campaign_id: campaignId },
+        orderBy: [{ day: 'asc' }, { attempt: 'asc' }],
+      });
+
+      // Group by day and attempt, and count completed leads for each
+      const attemptStats = await Promise.all(
+        cadenceStats.map(async (progress) => {
+          // Count completed leads for this specific attempt
+          // Parse time window (e.g., "02:00 AM - 02:30 AM") to get start and end times
+          const timeWindow = progress.time_window;
+          const [startTimeStr, endTimeStr] = timeWindow.split(' - ');
+
+          // Get the date from executed_at
+          const executedDate = new Date(progress.executed_at);
+          const year = executedDate.getFullYear();
+          const month = executedDate.getMonth();
+          const day = executedDate.getDate();
+
+          // Parse start time
+          const startTime = new Date(
+            `${month + 1}/${day}/${year} ${startTimeStr}`,
+          );
+
+          // Parse end time
+          let endTime = new Date(`${month + 1}/${day}/${year} ${endTimeStr}`);
+
+          // If end time is before start time, it means it's the next day
+          if (endTime <= startTime) {
+            endTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+          }
+
+          // Check activity logs where lead status is 'Completed' and created_at is within the time window
+          const completedCount = await this.prisma.leadActivityLog.count({
+            where: {
+              campaign_id: campaignId,
+              activity_type: 'CALL_ATTEMPT',
+              lead_status: 'Completed',
+              created_at: {
+                gte: startTime,
+                lte: endTime,
+              },
+            },
+          });
+
+          return {
+            day: progress.day,
+            attempt: progress.attempt,
+            timeWindow: progress.time_window,
+            executedAt: progress.executed_at,
+            completedLeads: completedCount,
+          };
+        }),
+      );
+
+      console.log('Cadence attempt stats:', attemptStats);
+
+      return {
+        userError: null,
+        data: attemptStats,
+      };
+    } catch (error) {
+      console.error('Error fetching campaign cadence count:', error);
+      return {
+        userError: { message: 'Failed to fetch campaign cadence count' },
+        data: null,
       };
     }
   }

@@ -89,18 +89,20 @@ export class WebhookService {
           ...(recordingUrl && { recordingUrl }),
         },
       });
-
-      await tx.leadActivityLog.create({
-        data: {
-          lead_id: leadId,
-          campaign_id: campaignId,
-          activity_type: 'CALL_ATTEMPT',
-          lead_status: status,
-          to_disposition: disposition,
-          duration: durationMinutes,
-          cost,
-        },
-      });
+      const wasInProgress = currentLead?.status === 'In Progress';
+      if (wasInProgress) {
+        await tx.leadActivityLog.create({
+          data: {
+            lead_id: leadId,
+            campaign_id: campaignId,
+            activity_type: 'CALL_ATTEMPT',
+            lead_status: status,
+            to_disposition: disposition,
+            duration: durationMinutes,
+            cost,
+          },
+        });
+      }
 
       // 3. Prepare campaign update fields with proper stats balancing
       const campaignUpdate: any = {
@@ -109,7 +111,6 @@ export class WebhookService {
       };
 
       // ✅ Only decrement in_progress if the lead was actually in progress
-      const wasInProgress = currentLead?.status === 'In Progress';
 
       if (status === 'Completed') {
         if (wasInProgress) {

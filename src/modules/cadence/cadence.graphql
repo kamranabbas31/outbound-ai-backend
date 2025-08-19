@@ -62,8 +62,22 @@ type DeleteCadenceTemplateResponse {
   success: Boolean!
 }
 
+type CadenceAttemptStats {
+  day: Int!
+  attempt: Int!
+  timeWindow: String!
+  executedAt: String!
+  completedLeads: Int!
+}
+
+type CadenceProgressStatsResponse {
+  userError: UserError
+  data: [CadenceAttemptStats!]
+}
+
 type Query {
   cadenceTemplates: CadenceTemplatesResponse!
+  getCadenceProgressStats(campaignId: String!): CadenceProgressStatsResponse!
 }
 
 type Mutation {
