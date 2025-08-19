@@ -23,7 +23,7 @@ export class CadenceService {
     });
   }
 
-  @Cron('0 */25 * * * *') // Run every 25 minutes
+  @Cron('0 */02 * * * *') // Run every 25 minutes
   async handleCadenceExecution() {
     this.logger.log('Checking cadence campaigns...');
 
@@ -134,6 +134,14 @@ export class CadenceService {
 
       if (!campaign?.cadence_template) {
         console.log('[INFO] No cadence_template found. Exiting...');
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: Unknown (no cadence template)`);
+        console.log(`  - Time window used: None (no cadence template)`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
+        console.log(`  - Status: No cadence template found`);
         return;
       }
 
@@ -153,6 +161,14 @@ export class CadenceService {
       console.log('[INFO] baseDate:', baseDate);
       if (!baseDate) {
         console.log('[SKIP] NO Cadence has started today');
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: Unknown (no base date)`);
+        console.log(`  - Time window used: None (no base date)`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
+        console.log(`  - Status: No cadence start date`);
         return;
       }
 
@@ -168,17 +184,36 @@ export class CadenceService {
         age,
         `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours)`,
       );
+      console.log(
+        '[INFO] Current time (EST):',
+        now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      );
 
       const dayConfig = cadenceDays[age.toString()];
       console.log('[INFO] dayConfig for age:', dayConfig);
       if (!dayConfig) {
         console.log('[SKIP] No cadence config for today.');
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: ${age}`);
+        console.log(`  - Time window used: None (no day config)`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
+        console.log(`  - Status: No cadence config for today`);
         return;
       }
 
       const { attempts: maxAttempts, time_windows } = dayConfig;
       console.log('[INFO] maxAttempts:', maxAttempts);
       console.log('[INFO] time_windows:', time_windows);
+      console.log(
+        '[INFO] Current time (EST):',
+        now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      );
+      console.log(
+        '[INFO] Checking if current time is in any of these windows...',
+      );
 
       const attemptsDoneToday = await this.prisma.cadenceProgress.count({
         where: {
@@ -190,6 +225,14 @@ export class CadenceService {
 
       if (attemptsDoneToday >= maxAttempts) {
         console.log('[SKIP] Max attempts reached for today.');
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: ${age}`);
+        console.log(`  - Time window used: None (max attempts reached)`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
+        console.log(`  - Status: Max attempts reached for today`);
         return;
       }
 
@@ -205,22 +248,43 @@ export class CadenceService {
 
       let assignedSlot = -1;
       for (let i = 0; i < time_windows.length; i++) {
+        const timeWindow = time_windows[i];
+        console.log(`[DEBUG] Checking time window ${i}: ${timeWindow}`);
+
         // Find last record for this slot
-        if (!isNowInTimeWindow(time_windows[i])) {
-          console.log(`[SKIP] Current time not in slot ${time_windows[i]}`);
+        if (!isNowInTimeWindow(timeWindow)) {
+          console.log(`[SKIP] Current time not in slot ${timeWindow}`);
           continue;
         }
 
+        // Check if this slot has any attempts today
+        const attemptsInThisSlot = await this.prisma.cadenceProgress.count({
+          where: {
+            campaign_id: campaignId,
+            cadence_id: cadence_template.id,
+            day: age,
+            time_window: timeWindow,
+          },
+        });
+
         const slotMaxAttempts = attemptDistribution[i];
-        if (attemptsDoneToday >= slotMaxAttempts) {
+        console.log(
+          `[DEBUG] Slot ${timeWindow}: attempts=${attemptsInThisSlot}, max=${slotMaxAttempts}`,
+        );
+
+        if (attemptsInThisSlot >= slotMaxAttempts) {
           console.log(
-            `[SKIP] Enough attempts  reached for time window ${time_windows[i]}`,
+            `[SKIP] Slot ${timeWindow} has reached max attempts (${attemptsInThisSlot}/${slotMaxAttempts})`,
           );
           continue;
         }
 
         assignedSlot = i;
-        console.log('[INFO] assignedSlot:', assignedSlot);
+        console.log(
+          '[INFO] assignedSlot:',
+          assignedSlot,
+          `for time window: ${timeWindow}`,
+        );
         break;
       }
 
@@ -228,6 +292,13 @@ export class CadenceService {
         console.log(
           '[SKIP] All time slots filled or not in current time window.',
         );
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: ${age}`);
+        console.log(`  - Time window used: None (no valid slots)`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
         return;
       }
       const cadenceProgressCount = await this.prisma.cadenceProgress.count({
@@ -250,10 +321,20 @@ export class CadenceService {
         },
       });
       console.log('[DB] leads fetched:', leads);
+      console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
+      console.log('[INFO] retryDispositions:', retryDispositions);
 
       let hasRetried = false;
       if (leads.length === 0) {
         console.log('[STOP] No leads found for this cadence run. Exiting...');
+        console.log('[SUMMARY] Campaign cadence execution summary:');
+        console.log(`  - Campaign ID: ${campaignId}`);
+        console.log(`  - Day: ${age}`);
+        console.log(`  - Time window used: ${time_windows[assignedSlot]}`);
+        console.log(`  - Leads processed: 0`);
+        console.log(`  - Calls triggered: No`);
+        console.log(`  - Progress recorded: No`);
+        console.log(`  - Status: No leads found for cadence run`);
         return;
       }
 
@@ -261,10 +342,28 @@ export class CadenceService {
         console.log('\n[LOOP] Processing lead:', lead);
         if (isFirstCadenceExecution) {
           console.log('[ACTION] Triggering normal call...');
-          await this.triggerCallService.triggerCall({ leadId: lead.id });
+          try {
+            await this.triggerCallService.triggerCall({ leadId: lead.id });
+            console.log('[SUCCESS] Normal call triggered for lead:', lead.id);
+          } catch (error) {
+            console.error(
+              '[ERROR] Failed to trigger normal call for lead:',
+              lead.id,
+              error,
+            );
+          }
         } else {
           console.log('[ACTION] Triggering cadence call...');
-          await this.triggerCallService.triggerCallForCadence(lead);
+          try {
+            await this.triggerCallService.triggerCallForCadence(lead);
+            console.log('[SUCCESS] Cadence call triggered for lead:', lead.id);
+          } catch (error) {
+            console.error(
+              '[ERROR] Failed to trigger cadence call for lead:',
+              lead.id,
+              error,
+            );
+          }
         }
 
         hasRetried = true;
@@ -279,6 +378,12 @@ export class CadenceService {
         },
       });
       console.log('[DB] cadenceProgress created:', newProgress);
+      console.log(
+        '[INFO] Progress recorded for day:',
+        age,
+        'time window:',
+        time_windows[assignedSlot],
+      );
       if (!hasRetried) {
         const lastCadenceDay = Math.max(
           ...Object.keys(cadenceDays).map((k) => parseInt(k)),
@@ -313,13 +418,37 @@ export class CadenceService {
           console.log('[DB] Campaign marked completed:', updatedCampaign);
 
           this.logger.log(`[CADENCE COMPLETED] Campaign ${campaignId}`);
+          console.log('[SUMMARY] Campaign cadence execution summary:');
+          console.log(`  - Campaign ID: ${campaignId}`);
+          console.log(`  - Day: ${age}`);
+          console.log(`  - Time window used: ${time_windows[assignedSlot]}`);
+          console.log(`  - Leads processed: ${leads.length}`);
+          console.log(`  - Calls triggered: ${hasRetried ? 'Yes' : 'No'}`);
+          console.log(`  - Progress recorded: Yes`);
+          console.log(`  - Status: Campaign marked as completed`);
           return 'completed';
         }
       }
 
       console.log('[END] executeCampaignCadence completed.');
+      console.log('[SUMMARY] Campaign cadence execution summary:');
+      console.log(`  - Campaign ID: ${campaignId}`);
+      console.log(`  - Day: ${age}`);
+      console.log(`  - Time window used: ${time_windows[assignedSlot]}`);
+      console.log(`  - Leads processed: ${leads.length}`);
+      console.log(`  - Calls triggered: ${hasRetried ? 'Yes' : 'No'}`);
+      console.log(`  - Progress recorded: Yes`);
+      console.log(`  - Status: Normal completion`);
     } catch (error) {
       console.error('[ERROR] executeCampaignCadence failed:', error);
+      console.log('[SUMMARY] Campaign cadence execution summary:');
+      console.log(`  - Campaign ID: ${campaignId}`);
+      console.log(`  - Day: Unknown (error occurred)`);
+      console.log(`  - Time window used: None (error occurred)`);
+      console.log(`  - Leads processed: 0`);
+      console.log(`  - Calls triggered: No`);
+      console.log(`  - Progress recorded: No`);
+      console.log(`  - Status: Error occurred`);
       this.logger.error(
         `Error executing cadence for campaign ${campaignId}:`,
         error,

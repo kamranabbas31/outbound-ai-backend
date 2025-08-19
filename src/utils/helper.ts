@@ -6,9 +6,8 @@ export function isNowInTimeWindow(window: string): boolean {
   const startTime = parseTimeString(startStr);
   const endTime = parseTimeString(endStr);
 
-  // Create Date objects for today with the parsed times
+  // Create Date objects for today with the parsed times in EST
   const start = new Date(now);
-  console.log({ start });
   start.setHours(startTime.hours, startTime.minutes, 0, 0);
 
   const end = new Date(now);
@@ -19,7 +18,15 @@ export function isNowInTimeWindow(window: string): boolean {
     end.setDate(end.getDate() + 1);
   }
 
-  console.log({ now, start, end, startTime, endTime });
+  console.log({
+    window,
+    now: now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+    start: start.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+    end: end.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+    startTime,
+    endTime,
+    result: now >= start && now <= end,
+  });
   return now >= start && now <= end;
 }
 
