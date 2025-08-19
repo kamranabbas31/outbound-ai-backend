@@ -697,9 +697,18 @@ export class CadenceService {
         hours = 0;
       }
 
+      // Create a new date object and set the time in local timezone
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
-      return result;
+
+      // Convert to UTC by adjusting for timezone offset
+      const timezoneOffset = result.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
+      const utcResult = new Date(result.getTime() + timezoneOffset);
+
+      console.log(
+        `Parsed time: "${timeStr}" -> Local: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+      );
+      return utcResult;
     }
 
     // Handle 24-hour format (e.g., "14:00", "02:30")
@@ -708,9 +717,18 @@ export class CadenceService {
       const hours = parseInt(timeMatch24[1], 10);
       const minutes = parseInt(timeMatch24[2], 10);
 
+      // Create a new date object and set the time in local timezone
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
-      return result;
+
+      // Convert to UTC by adjusting for timezone offset
+      const timezoneOffset = result.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
+      const utcResult = new Date(result.getTime() + timezoneOffset);
+
+      console.log(
+        `Parsed time: "${timeStr}" -> Local: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+      );
+      return utcResult;
     }
 
     // If parsing fails, return the base date
@@ -738,16 +756,22 @@ export class CadenceService {
           // Count completed leads for this specific attempt
           // Parse time window (e.g., "02:00 AM - 02:30 AM" or "02:00 AM-02:30 AM") to get start and end times
           const timeWindow = progress.time_window;
+          console.log(
+            `Processing time window: "${timeWindow}" for day ${progress.day}, attempt ${progress.attempt}`,
+          );
+
           // Handle both formats: " - " and "-"
           const [startTimeStr, endTimeStr] = timeWindow.includes(' - ')
             ? timeWindow.split(' - ')
             : timeWindow.split('-');
 
+          console.log(
+            `Split time window: start="${startTimeStr}", end="${endTimeStr}"`,
+          );
+
           // Get the date from executed_at
           const executedDate = new Date(progress.executed_at);
-          const year = executedDate.getFullYear();
-          const month = executedDate.getMonth();
-          const day = executedDate.getDate();
+          console.log(`Base executed date: ${executedDate.toISOString()}`);
 
           // Parse start time - handle AM/PM format properly
           const startTime = this.parseTimeString(startTimeStr, executedDate);
@@ -758,9 +782,20 @@ export class CadenceService {
           // If end time is before start time, it means it's the next day
           if (endTime <= startTime) {
             endTime = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+            console.log(
+              `End time adjusted to next day: ${endTime.toISOString()}`,
+            );
           }
 
+          console.log(
+            `Final time window: ${startTime.toISOString()} to ${endTime.toISOString()}`,
+          );
+
           // Check activity logs where lead status is 'Completed' and created_at is within the time window
+          console.log(
+            `Querying leadActivityLog for campaign ${campaignId} between ${startTime.toISOString()} and ${endTime.toISOString()}`,
+          );
+
           const completedCount = await this.prisma.leadActivityLog.count({
             where: {
               campaign_id: campaignId,
@@ -772,6 +807,8 @@ export class CadenceService {
               },
             },
           });
+
+          console.log(`Found ${completedCount} completed leads in time window`);
 
           return {
             day: progress.day,
