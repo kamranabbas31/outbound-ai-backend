@@ -674,6 +674,12 @@ export class CadenceService {
   }
 
   private parseTimeString(timeStr: string, baseDate: Date): Date {
+    // Check if timeStr is defined and is a string
+    if (!timeStr || typeof timeStr !== 'string') {
+      console.warn(`Invalid time string: "${timeStr}", using base date`);
+      return new Date(baseDate);
+    }
+
     // Remove any extra whitespace
     timeStr = timeStr.trim();
 
@@ -730,9 +736,12 @@ export class CadenceService {
       const attemptStats = await Promise.all(
         cadenceStats.map(async (progress) => {
           // Count completed leads for this specific attempt
-          // Parse time window (e.g., "02:00 AM - 02:30 AM") to get start and end times
+          // Parse time window (e.g., "02:00 AM - 02:30 AM" or "02:00 AM-02:30 AM") to get start and end times
           const timeWindow = progress.time_window;
-          const [startTimeStr, endTimeStr] = timeWindow.split(' - ');
+          // Handle both formats: " - " and "-"
+          const [startTimeStr, endTimeStr] = timeWindow.includes(' - ')
+            ? timeWindow.split(' - ')
+            : timeWindow.split('-');
 
           // Get the date from executed_at
           const executedDate = new Date(progress.executed_at);
