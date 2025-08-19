@@ -115,7 +115,7 @@ model LeadActivityLog {
   to_disposition   String?      // New disposition
   disposition_at   DateTime?    // When disposition changed
 
-  duration         Int?         // In seconds (if needed)
+  duration         Float?         // In seconds (if needed)
   cost             Float?       // In USD (if needed)
 
   lead_status            String?      // Optional note/description

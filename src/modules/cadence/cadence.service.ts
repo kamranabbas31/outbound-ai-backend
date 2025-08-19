@@ -673,6 +673,45 @@ export class CadenceService {
     }
   }
 
+  private parseTimeString(timeStr: string, baseDate: Date): Date {
+    // Remove any extra whitespace
+    timeStr = timeStr.trim();
+
+    // Handle 12-hour format (e.g., "02:00 AM", "2:30 PM")
+    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const period = timeMatch[3].toUpperCase();
+
+      // Convert to 24-hour format
+      if (period === 'PM' && hours !== 12) {
+        hours += 12;
+      } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+      }
+
+      const result = new Date(baseDate);
+      result.setHours(hours, minutes, 0, 0);
+      return result;
+    }
+
+    // Handle 24-hour format (e.g., "14:00", "02:30")
+    const timeMatch24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (timeMatch24) {
+      const hours = parseInt(timeMatch24[1], 10);
+      const minutes = parseInt(timeMatch24[2], 10);
+
+      const result = new Date(baseDate);
+      result.setHours(hours, minutes, 0, 0);
+      return result;
+    }
+
+    // If parsing fails, return the base date
+    console.warn(`Failed to parse time string: "${timeStr}", using base date`);
+    return new Date(baseDate);
+  }
+
   async getCadenceProgressStats(campaignId: string): Promise<{
     userError: { message: string } | null;
     data: any[] | null;
@@ -701,13 +740,11 @@ export class CadenceService {
           const month = executedDate.getMonth();
           const day = executedDate.getDate();
 
-          // Parse start time
-          const startTime = new Date(
-            `${month + 1}/${day}/${year} ${startTimeStr}`,
-          );
+          // Parse start time - handle AM/PM format properly
+          const startTime = this.parseTimeString(startTimeStr, executedDate);
 
-          // Parse end time
-          let endTime = new Date(`${month + 1}/${day}/${year} ${endTimeStr}`);
+          // Parse end time - handle AM/PM format properly
+          let endTime = this.parseTimeString(endTimeStr, executedDate);
 
           // If end time is before start time, it means it's the next day
           if (endTime <= startTime) {
