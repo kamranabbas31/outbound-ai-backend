@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType } from '@prisma/client';
+import { ActivityType } from 'src/graphql';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import {
   calculateCallCost,
