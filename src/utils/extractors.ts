@@ -264,7 +264,7 @@ export function extractDuration(payload) {
   if (payload.message?.duration) {
     return payload.message.duration;
   }
-  return 0;
+  return 0.0;
 }
 // Enhanced disposition extraction function with comprehensive logging
 export function extractDisposition(payload: any): string {

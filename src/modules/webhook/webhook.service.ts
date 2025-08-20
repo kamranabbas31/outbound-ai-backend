@@ -98,8 +98,8 @@ export class WebhookService {
           activity_type: ActivityType.CALL_ATTEMPT,
           lead_status: status,
           to_disposition: disposition,
-          duration: Number(durationMinutes), // ✅ force number
-          cost: Number(cost),
+          duration: Number(durationMinutes) ?? 0.0, // ✅ force number
+          cost: Number(cost) ?? 0.0,
         });
         await tx.leadActivityLog.create({
           data: {
