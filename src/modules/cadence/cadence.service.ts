@@ -7,6 +7,7 @@ import { TriggerCallService } from '../call/trigger-call.service';
 import { Queue } from 'bullmq';
 import { redisConfig } from 'src/utils/redis';
 import { isNowInTimeWindow } from 'src/utils/helper';
+import { ActivityType } from '@prisma/client';
 
 @Injectable()
 export class CadenceService {
@@ -818,7 +819,7 @@ export class CadenceService {
           const completedCount = await this.prisma.leadActivityLog.count({
             where: {
               campaign_id: campaignId,
-              activity_type: 'CALL_ATTEMPT',
+              activity_type: ActivityType.CALL_ATTEMPT,
               lead_status: 'Completed',
               created_at: {
                 gte: startTime,

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ActivityType } from '@prisma/client';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import {
   calculateCallCost,
@@ -95,7 +96,7 @@ export class WebhookService {
           data: {
             lead_id: leadId,
             campaign_id: campaignId,
-            activity_type: 'CALL_ATTEMPT',
+            activity_type: ActivityType.CALL_ATTEMPT,
             lead_status: status,
             to_disposition: disposition,
             duration: durationMinutes,
