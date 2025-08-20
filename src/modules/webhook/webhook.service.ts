@@ -119,6 +119,7 @@ export class WebhookService {
       const campaignUpdate: any = {
         cost: { increment: cost },
         duration: { increment: durationMinutes },
+        status: 'InProgress',
       };
 
       // ✅ Only decrement in_progress if the lead was actually in progress
@@ -143,6 +144,37 @@ export class WebhookService {
             '📈 Campaign status update: Failed (was not in progress)',
           );
         }
+      }
+      const actualStats = await tx.leads.groupBy({
+        by: ['status'],
+        where: { campaign_id: campaignId },
+        _count: { status: true },
+      });
+
+      // Get total leads count for this campaign
+      const totalLeadsCount = await tx.leads.count({
+        where: { campaign_id: campaignId },
+      });
+
+      const actualCompleted =
+        actualStats.find((s) => s.status === 'Completed')?._count.status || 0;
+      const actualInProgress =
+        actualStats.find((s) => s.status === 'In Progress')?._count.status || 0;
+      const actualFailed =
+        actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
+      const actualRemaining =
+        totalLeadsCount - actualCompleted - actualInProgress - actualFailed;
+      // Update campaign status based on lead distribution
+
+      if (actualCompleted === totalLeadsCount) {
+        // All leads are completed
+        campaignUpdate.status = 'Completed';
+      } else if (actualFailed === totalLeadsCount) {
+        // All leads have failed
+        campaignUpdate.status = 'Failed';
+      } else if (actualInProgress > 0) {
+        // Some leads are still in progress
+        campaignUpdate.status = 'InProgress';
       }
 
       // 4. Apply campaign update
