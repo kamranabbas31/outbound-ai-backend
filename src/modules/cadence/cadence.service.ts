@@ -698,7 +698,7 @@ export class CadenceService {
       }
 
       // Create a new date object and set the time in EST
-      // baseDate is already in EST timezone (we converted it earlier)
+      // baseDate is in UTC, but we want to set EST time on it
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
@@ -719,7 +719,7 @@ export class CadenceService {
       const minutes = parseInt(timeMatch24[2], 10);
 
       // Create a new date object and set the time in EST
-      // baseDate is already in EST timezone (we converted it earlier)
+      // baseDate is in UTC, but we want to set EST time on it
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
@@ -775,23 +775,19 @@ export class CadenceService {
           const executedDate = new Date(progress.executed_at);
           console.log(`Base executed date: ${executedDate.toISOString()}`);
 
-          // Create a date object for the same day but at midnight (00:00:00) in EST
-          // Since executed_at is UTC, we need to convert to EST first, then create the date
-          const estDate = new Date(executedDate.getTime() - 5 * 60 * 60 * 1000); // Convert UTC to EST
+          // Create a date object for the same day but at midnight (00:00:00) in UTC
+          // Since executed_at is UTC, we use it directly
           const sameDayDate = new Date(
-            estDate.getFullYear(),
-            estDate.getMonth(),
-            estDate.getDate(),
+            executedDate.getFullYear(),
+            executedDate.getMonth(),
+            executedDate.getDate(),
           );
           console.log(
-            `Same day date (midnight EST): ${sameDayDate.toISOString()}`,
-          );
-          console.log(
-            `Converting UTC ${executedDate.toISOString()} to EST ${estDate.toISOString()}`,
+            `Same day date (midnight UTC): ${sameDayDate.toISOString()}`,
           );
 
           // Parse start time - handle AM/PM format properly, using the same day
-          // The time windows are in EST, so parse them as EST times
+          // The time windows are in EST, so we'll convert them to UTC in parseTimeString
           const startTime = this.parseTimeString(startTimeStr, sameDayDate);
 
           // Parse end time - handle AM/PM format properly, using the same day
@@ -809,7 +805,7 @@ export class CadenceService {
             `Final time window: ${startTime.toISOString()} to ${endTime.toISOString()}`,
           );
           console.log(
-            `Looking for activities on: ${sameDayDate.toDateString()}`,
+            `Looking for activities on: ${sameDayDate.toDateString()} (UTC)`,
           );
 
           // Check activity logs where lead status is 'Completed' and created_at is within the time window
