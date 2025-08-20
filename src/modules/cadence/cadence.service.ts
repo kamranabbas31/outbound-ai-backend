@@ -265,7 +265,6 @@ export class CadenceService {
             cadence_id: cadence_template.id,
             day: age,
             time_window: timeWindow,
-            attempt: attemptsDoneToday + 1,
           },
         });
 
