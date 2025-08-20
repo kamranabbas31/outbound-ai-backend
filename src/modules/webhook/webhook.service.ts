@@ -101,17 +101,6 @@ export class WebhookService {
           duration: durationMinutes ?? 0.0, // ✅ force number
           cost: cost ?? 0.0,
         });
-        await tx.leadActivityLog.create({
-          data: {
-            lead_id: leadId,
-            campaign_id: campaignId,
-            activity_type: ActivityType.CALL_ATTEMPT,
-            lead_status: status || null,
-            to_disposition: disposition || null,
-            duration: durationMinutes ?? 0.0, // ✅ force number
-            cost: cost ?? 0.0,
-          },
-        });
       }
 
       // 3. Prepare campaign update fields with proper stats balancing
@@ -143,7 +132,17 @@ export class WebhookService {
           );
         }
       }
-
+      await tx.leadActivityLog.create({
+        data: {
+          lead_id: leadId,
+          campaign_id: campaignId,
+          activity_type: ActivityType.CALL_ATTEMPT,
+          lead_status: status || null,
+          to_disposition: disposition || null,
+          duration: durationMinutes ?? 0.0, // ✅ force number
+          cost: cost ?? 0.0,
+        },
+      });
       // 4. Apply campaign update
       const updatedCampaign = await tx.campaigns.update({
         where: { id: campaignId },
