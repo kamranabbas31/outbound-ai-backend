@@ -220,19 +220,17 @@ export class WebhookService {
           const actualFailed =
             actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
           const actualRemaining =
-            actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
+            totalLeadsCount - actualCompleted - actualInProgress - actualFailed;
           // Update campaign status based on lead distribution
           let campaignStatus: string = 'InProgress';
 
           if (actualCompleted === totalLeadsCount) {
             // All leads are completed
             campaignStatus = 'Completed';
-          }
-          if (actualFailed === totalLeadsCount) {
+          } else if (actualFailed === totalLeadsCount) {
             // All leads have failed
             campaignStatus = 'Failed';
-          }
-          if (actualInProgress > 0) {
+          } else if (actualInProgress > 0) {
             // Some leads are still in progress
             campaignStatus = 'InProgress';
           }
