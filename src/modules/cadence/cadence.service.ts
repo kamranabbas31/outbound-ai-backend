@@ -459,6 +459,7 @@ export class CadenceService {
   }
 
   async createCadenceTemplate(input: {
+    userId: string;
     name: string;
     retry_dispositions: string[];
     cadence_days: {
@@ -469,7 +470,7 @@ export class CadenceService {
       };
     }[];
   }) {
-    const { name, retry_dispositions, cadence_days } = input;
+    const { name, retry_dispositions, cadence_days, userId } = input;
 
     // 🔒 Check if a cadence with the same name already exists
     const existing = await this.prisma.cadenceTemplate.findFirst({
@@ -495,6 +496,7 @@ export class CadenceService {
         name,
         retry_dispositions,
         cadence_days: cadenceMap,
+        user_id: userId,
       },
       include: {
         campaigns: {

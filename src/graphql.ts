@@ -44,6 +44,7 @@ export interface CadenceDaysInput {
 }
 
 export interface CreateCadenceTemplateInput {
+    userId: string;
     name: string;
     retry_dispositions: string[];
     cadence_days: CadenceDaysInput[];
