@@ -92,15 +92,24 @@ export class WebhookService {
       });
       const wasInProgress = currentLead?.status === 'In Progress';
       if (wasInProgress) {
+        console.log({
+          lead_id: leadId,
+          campaign_id: campaignId,
+          activity_type: ActivityType.CALL_ATTEMPT,
+          lead_status: status,
+          to_disposition: disposition,
+          duration: Number(durationMinutes), // ✅ force number
+          cost: Number(cost),
+        });
         await tx.leadActivityLog.create({
           data: {
             lead_id: leadId,
             campaign_id: campaignId,
             activity_type: ActivityType.CALL_ATTEMPT,
-            lead_status: status,
-            to_disposition: disposition,
-            duration: durationMinutes,
-            cost,
+            lead_status: status || null,
+            to_disposition: disposition || null,
+            duration: Number(durationMinutes) || 0, // ✅ force number
+            cost: Number(cost) || 0, // ✅ force number
           },
         });
       }
