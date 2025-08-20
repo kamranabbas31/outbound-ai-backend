@@ -702,12 +702,13 @@ export class CadenceService {
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
-      // Convert EST to UTC by adding 5 hours (EST is UTC-5)
-      const estToUtcOffset = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
-      const utcResult = new Date(result.getTime() + estToUtcOffset);
+      // Convert EDT to UTC by adding 4 hours (EDT is UTC-4 in summer)
+      // Note: EST is UTC-5 in winter, EDT is UTC-4 in summer
+      const edtToUtcOffset = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+      const utcResult = new Date(result.getTime() + edtToUtcOffset);
 
       console.log(
-        `Parsed time: "${timeStr}" -> EST: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" -> EDT: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
       );
       return utcResult;
     }
@@ -723,12 +724,13 @@ export class CadenceService {
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
-      // Convert EST to UTC by adding 5 hours (EST is UTC-5)
-      const estToUtcOffset = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
-      const utcResult = new Date(result.getTime() + estToUtcOffset);
+      // Convert EDT to UTC by adding 4 hours (EDT is UTC-4 in summer)
+      // Note: EST is UTC-5 in winter, EDT is UTC-4 in summer
+      const edtToUtcOffset = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+      const utcResult = new Date(result.getTime() + edtToUtcOffset);
 
       console.log(
-        `Parsed time: "${timeStr}" -> EST: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" -> EDT: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
       );
       return utcResult;
     }
