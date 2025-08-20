@@ -123,33 +123,33 @@ export class WebhookService {
 
       // ✅ Only decrement in_progress if the lead was actually in progress
 
-      if (status === 'Completed') {
-        if (wasInProgress) {
-          campaignUpdate.completed = { increment: 1 };
-          campaignUpdate.in_progress = { decrement: 1 };
-          console.log('📈 Campaign status update: Completed (was in progress)');
-        } else {
-          console.log(
-            '📈 Campaign status update: Completed (was not in progress)',
-          );
-        }
-      } else if (status === 'Failed') {
-        if (wasInProgress) {
-          campaignUpdate.failed = { increment: 1 };
-          campaignUpdate.in_progress = { decrement: 1 };
-          console.log('📈 Campaign status update: Failed (was in progress)');
-        } else {
-          console.log(
-            '📈 Campaign status update: Failed (was not in progress)',
-          );
-        }
-      }
+      // if (status === 'Completed') {
+      //   if (wasInProgress) {
+      //     campaignUpdate.completed = { increment: 1 };
+      //     campaignUpdate.in_progress = { decrement: 1 };
+      //     console.log('📈 Campaign status update: Completed (was in progress)');
+      //   } else {
+      //     console.log(
+      //       '📈 Campaign status update: Completed (was not in progress)',
+      //     );
+      //   }
+      // } else if (status === 'Failed') {
+      //   if (wasInProgress) {
+      //     campaignUpdate.failed = { increment: 1 };
+      //     campaignUpdate.in_progress = { decrement: 1 };
+      //     console.log('📈 Campaign status update: Failed (was in progress)');
+      //   } else {
+      //     console.log(
+      //       '📈 Campaign status update: Failed (was not in progress)',
+      //     );
+      //   }
+      // }
 
-      // 4. Apply campaign update
-      const updatedCampaign = await tx.campaigns.update({
-        where: { id: campaignId },
-        data: campaignUpdate,
-      });
+      // // 4. Apply campaign update
+      // const updatedCampaign = await tx.campaigns.update({
+      //   where: { id: campaignId },
+      //   data: campaignUpdate,
+      // });
 
       // 5. Validate and fix campaign stats balance
       const campaignStats = await tx.campaigns.findUnique({
@@ -215,24 +215,20 @@ export class WebhookService {
           const actualFailed =
             actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
           const actualRemaining =
-            campaignStats.leads_count -
-            actualCompleted -
-            actualInProgress -
-            actualFailed;
+            actualStats.find((s) => s.status === 'Pending')?._count.status || 0;
           // Update campaign status based on lead distribution
-          let campaignStatus: string;
+          let campaignStatus: string = '';
 
-          if (actualCompleted === campaignStats.leads_count) {
+          if (actualCompleted == campaignStats.leads_count) {
             // All leads are completed
             campaignStatus = 'Completed';
-          } else if (actualFailed === campaignStats.leads_count) {
+          }
+          if (actualFailed == campaignStats.leads_count) {
             // All leads have failed
             campaignStatus = 'Failed';
-          } else if (actualInProgress > 0) {
+          }
+          if (actualInProgress > 0) {
             // Some leads are still in progress
-            campaignStatus = 'InProgress';
-          } else {
-            // Default to 'In Progress' if there are remaining leads
             campaignStatus = 'InProgress';
           }
 
