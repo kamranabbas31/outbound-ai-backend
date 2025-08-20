@@ -697,16 +697,16 @@ export class CadenceService {
         hours = 0;
       }
 
-      // Create a new date object and set the time in local timezone
+      // Create a new date object and set the time in EST (UTC-5)
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
-      // Convert to UTC by adjusting for timezone offset
-      const timezoneOffset = result.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
-      const utcResult = new Date(result.getTime() + timezoneOffset);
+      // Convert EST to UTC by adding 5 hours (EST is UTC-5)
+      const estToUtcOffset = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+      const utcResult = new Date(result.getTime() + estToUtcOffset);
 
       console.log(
-        `Parsed time: "${timeStr}" -> Local: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" -> EST: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
       );
       return utcResult;
     }
@@ -717,16 +717,16 @@ export class CadenceService {
       const hours = parseInt(timeMatch24[1], 10);
       const minutes = parseInt(timeMatch24[2], 10);
 
-      // Create a new date object and set the time in local timezone
+      // Create a new date object and set the time in EST (UTC-5)
       const result = new Date(baseDate);
       result.setHours(hours, minutes, 0, 0);
 
-      // Convert to UTC by adjusting for timezone offset
-      const timezoneOffset = result.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
-      const utcResult = new Date(result.getTime() + timezoneOffset);
+      // Convert EST to UTC by adding 5 hours (EST is UTC-5)
+      const estToUtcOffset = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+      const utcResult = new Date(result.getTime() + estToUtcOffset);
 
       console.log(
-        `Parsed time: "${timeStr}" -> Local: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" -> EST: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
       );
       return utcResult;
     }
