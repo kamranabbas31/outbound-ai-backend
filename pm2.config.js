@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'nestjs-app',
+      name: 'app',
       script: 'dist/main.js',
       env: {
         NODE_TLS_REJECT_UNAUTHORIZED: '0', 
