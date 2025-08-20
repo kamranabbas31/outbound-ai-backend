@@ -614,9 +614,13 @@ export class CadenceService {
     });
   }
 
-  async getCadenceTemplates() {
+  async getCadenceTemplates(userId: string) {
     try {
       const templates = await this.prisma.cadenceTemplate.findMany({
+        where: {
+          user_id: userId,
+        },
+
         include: {
           campaigns: {
             select: {

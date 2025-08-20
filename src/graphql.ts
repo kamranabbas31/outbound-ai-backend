@@ -130,7 +130,7 @@ export interface UserError {
 export interface IQuery {
     leadActivityLogs(filter: LeadActivityLogFilterInput): LeadActivityLogResponse | Promise<LeadActivityLogResponse>;
     fetchBillingData(userId: string, start: string, end: string): BillingStatsResponse | Promise<BillingStatsResponse>;
-    cadenceTemplates(): CadenceTemplatesResponse | Promise<CadenceTemplatesResponse>;
+    cadenceTemplates(userId: string): CadenceTemplatesResponse | Promise<CadenceTemplatesResponse>;
     getCadenceProgressStats(campaignId: string): CadenceProgressStatsResponse | Promise<CadenceProgressStatsResponse>;
     fetchCampaigns(userId: string): CampaignListResponse | Promise<CampaignListResponse>;
     fetchLeadsForCampaign(campaignId: string, skip?: Nullable<number>, take?: Nullable<number>, searchTerm?: Nullable<string>): LeadListResponse | Promise<LeadListResponse>;

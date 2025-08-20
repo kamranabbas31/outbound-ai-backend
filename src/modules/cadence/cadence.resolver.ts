@@ -6,8 +6,8 @@ export class CadenceResolver {
   constructor(private readonly cadenceService: CadenceService) {}
 
   @Query('cadenceTemplates')
-  async getCadenceTemplates() {
-    return await this.cadenceService.getCadenceTemplates();
+  async getCadenceTemplates(@Args('userId') userId: string) {
+    return await this.cadenceService.getCadenceTemplates(userId);
   }
 
   @Mutation('createCadenceTemplate')
