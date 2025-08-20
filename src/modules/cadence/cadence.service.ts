@@ -367,7 +367,7 @@ export class CadenceService {
             );
           }
         }
-
+        await new Promise((res) => setTimeout(res, 2000));
         hasRetried = true;
       }
       const newProgress = await this.prisma.cadenceProgress.create({

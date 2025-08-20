@@ -35,12 +35,6 @@ npx prisma generate || {
   exit 1
 }
 
-echo "📦 Deploying Prisma migrations..."
-npx prisma migrate dev --name deploy || {
-  echo "❌ prisma migrate deploy failed"
-  exit 1
-}
-
 # Deploy latest DB migrations
 echo "📦 Deploying Prisma migrations..."
 npx prisma migrate deploy || {
