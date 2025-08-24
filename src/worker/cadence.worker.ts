@@ -48,7 +48,7 @@ async function bootstrapCadenceWorker() {
         try {
           // Add timeout for job execution
           const executionPromise =
-            resumeCadence === 'false'
+            resumeCadence == 'false'
               ? cadenceService.executeCampaignCadence(campaignId)
               : cadenceService.executeResumeCadence(campaignId);
 
