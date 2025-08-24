@@ -34,6 +34,7 @@ input CreateCadenceTemplateInput {
 
 input UpdateCadenceTemplateInput {
   id: String!
+  userId: String
   name: String
   retry_dispositions: [String!]
   cadence_days: [CadenceDaysInput!]
