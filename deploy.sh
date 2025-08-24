@@ -21,6 +21,14 @@ git pull origin master || {
   exit 1
 }
 
+# Replace .env with .env.production
+echo "🔄 Refreshing environment file..."
+rm -f .env
+cp .env.production .env || {
+  echo "❌ Failed to copy .env.production"
+  exit 1
+}
+
 # Install dependencies
 echo "📦 Installing dependencies..."
 npm install || {
