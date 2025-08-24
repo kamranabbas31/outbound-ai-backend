@@ -44,7 +44,7 @@ async function bootstrapCadenceWorker() {
         console.log(
           `Processing cadence for campaign ${campaignId}, attempt ${job.attemptsMade + 1}`,
         );
-
+        console.log({ resumeCadence });
         try {
           // Add timeout for job execution
           const executionPromise =
