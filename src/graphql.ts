@@ -52,6 +52,7 @@ export interface CreateCadenceTemplateInput {
 
 export interface UpdateCadenceTemplateInput {
     id: string;
+    userId?: Nullable<string>;
     name?: Nullable<string>;
     retry_dispositions?: Nullable<string[]>;
     cadence_days?: Nullable<CadenceDaysInput[]>;
@@ -97,6 +98,10 @@ export interface UpdateCampaignInput {
     cadence_start_date?: Nullable<DateTime>;
     cadence_stopped?: Nullable<boolean>;
     cadence_completed?: Nullable<boolean>;
+    resume_campaign_cadence?: Nullable<boolean>;
+    cadence_resume_day?: Nullable<number>;
+    cadence_paused_at?: Nullable<DateTime>;
+    cadence_resume_from_date?: Nullable<DateTime>;
 }
 
 export interface CreateUserInput {

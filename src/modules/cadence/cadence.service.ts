@@ -151,6 +151,37 @@ export class CadenceService {
           `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
         );
       }
+      const cadenceDayKeys = Object.keys(cadenceDays)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const lastCadenceDay = Math.max(...cadenceDayKeys);
+
+      if (ageDay >= lastCadenceDay) {
+        // Check if attempts for the last day are completed
+        const lastDayAttempts = await this.prisma.cadenceProgress.count({
+          where: {
+            campaign_id: campaign.id,
+            cadence_id: campaign?.cadence_template?.id,
+            day: lastCadenceDay,
+          },
+        });
+
+        const lastDayConfig = cadenceDays[lastCadenceDay.toString()];
+        if (lastDayConfig && lastDayAttempts >= lastDayConfig.attempts) {
+          this.logger.log(
+            `[COMPLETE] Campaign ${campaign.id}: Last day (${lastCadenceDay}) completed with all attempts (${lastDayConfig.attempts}). Marking cadence as completed.`,
+          );
+
+          await this.prisma.campaigns.update({
+            where: { id: campaign.id },
+            data: {
+              cadence_completed: true,
+            },
+          });
+
+          continue;
+        }
+      }
       const dayConfig = cadenceDays[ageDay.toString()];
       if (!dayConfig) {
         this.logger.log(
