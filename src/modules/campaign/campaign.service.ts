@@ -100,6 +100,9 @@ export class CampaignsService {
             select: {
               id: true,
               name: true,
+              cadence_days: true,
+              retry_dispositions: true,
+              created_at: true,
             },
           },
           cadence_progress: {
@@ -313,7 +316,14 @@ export class CampaignsService {
             select: {
               id: true,
               name: true,
+              cadence_days: true,
+              retry_dispositions: true,
+              created_at: true,
             },
+          },
+          cadence_progress: {
+            orderBy: { executed_at: 'desc' },
+            take: 1, // ✅ Only the latest progress
           },
         },
       });
@@ -662,7 +672,13 @@ export class CampaignsService {
         data: updateData,
         include: {
           cadence_template: {
-            select: { id: true, name: true },
+            select: {
+              id: true,
+              name: true,
+              cadence_days: true,
+              retry_dispositions: true,
+              created_at: true,
+            },
           },
         },
       });

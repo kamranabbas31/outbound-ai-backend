@@ -213,6 +213,10 @@ export interface Campaign {
     cadence_start_date?: Nullable<DateTime>;
     cadence_stopped?: Nullable<boolean>;
     cadence_completed?: Nullable<boolean>;
+    resume_campaign_cadence?: Nullable<boolean>;
+    cadence_resume_day?: Nullable<number>;
+    cadence_paused_at?: Nullable<DateTime>;
+    cadence_resume_from_date?: Nullable<DateTime>;
     cadence_progress?: Nullable<Nullable<CadenceProgress>[]>;
 }
 

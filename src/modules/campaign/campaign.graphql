@@ -25,6 +25,10 @@ type Campaign {
   cadence_start_date: DateTime
   cadence_stopped: Boolean
   cadence_completed: Boolean
+  resume_campaign_cadence: Boolean
+  cadence_resume_day: Int
+  cadence_paused_at: DateTime
+  cadence_resume_from_date: DateTime
   cadence_progress: [CadenceProgress]
 }
 

@@ -39,6 +39,11 @@ export class CadenceService {
       select: {
         id: true,
         cadence_start_date: true,
+        resume_campaign_cadence: true,
+        cadence_paused_at: true, // 🔑 NEW
+        cadence_resume_from_date: true, // 🔑 NEW
+        cadence_resume_day: true,
+        cadence_completed: true,
         cadence_template: {
           select: {
             id: true,
@@ -71,18 +76,42 @@ export class CadenceService {
       }
 
       // Calculate age with hours precision
-      const now = new Date();
-      const ageInHours =
-        (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
-      const ageInDays = ageInHours / 24;
-      const ageDay = Math.floor(ageInDays) + 1; // Convert to integer for day lookup
+      let ageDay: number | null;
 
-      this.logger.log(
-        `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
-      );
+      if (
+        campaign.resume_campaign_cadence &&
+        campaign.cadence_resume_from_date &&
+        campaign.cadence_resume_day
+      ) {
+        const now = new Date();
+        const ageInHours =
+          (now.getTime() - campaign.cadence_resume_from_date.getTime()) /
+          (1000 * 60 * 60);
+        const ageInDays = ageInHours / 24;
+        ageDay = Math.floor(ageInDays) + campaign.cadence_resume_day;
 
+        if (ageDay === null) {
+          this.logger.log(
+            `[RESUME-SKIP] Campaign ${campaign.id}: Cadence completed or no valid day`,
+          );
+          continue;
+        }
+        this.logger.log(
+          `[RESUME-INFO] Campaign ${campaign.id}: Resume Day: ${ageDay}`,
+        );
+      } else {
+        // Use normal logic (time-based day calculation) - EXISTING CODE UNCHANGED
+        const now = new Date();
+        const ageInHours =
+          (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
+        const ageInDays = ageInHours / 24;
+        ageDay = Math.floor(ageInDays) + 1; // Convert to integer for day lookup
+
+        this.logger.log(
+          `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
+        );
+      }
       const dayConfig = cadenceDays[ageDay.toString()];
-
       if (!dayConfig) {
         this.logger.log(
           `[SKIP] Campaign ${campaign.id}: No config for day ${ageDay}`,
@@ -105,10 +134,42 @@ export class CadenceService {
         );
         continue;
       }
+      // Check if this is the last day in the cadence and attempts are completed
+      const cadenceDayKeys = Object.keys(cadenceDays)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const lastCadenceDay = Math.max(...cadenceDayKeys);
 
+      if (ageDay >= lastCadenceDay) {
+        // Check if attempts for the last day are completed
+        const lastDayAttempts = await this.prisma.cadenceProgress.count({
+          where: {
+            campaign_id: campaign.id,
+            cadence_id: campaign?.cadence_template?.id,
+            day: lastCadenceDay,
+          },
+        });
+
+        const lastDayConfig = cadenceDays[lastCadenceDay.toString()];
+        if (lastDayConfig && lastDayAttempts >= lastDayConfig.attempts) {
+          this.logger.log(
+            `[COMPLETE] Campaign ${campaign.id}: Last day (${lastCadenceDay}) completed with all attempts (${lastDayConfig.attempts}). Marking cadence as completed.`,
+          );
+
+          await this.prisma.campaigns.update({
+            where: { id: campaign.id },
+            data: {
+              cadence_completed: true,
+            },
+          });
+
+          continue;
+        }
+      }
       // Step 4: Queue it
       await this.cadenceQueue.add('execute-cadence', {
         campaignId: campaign.id,
+        resumeCadence: campaign.resume_campaign_cadence,
       });
 
       queuedCount++;
@@ -391,10 +452,10 @@ export class CadenceService {
         );
         console.log('[INFO] lastCadenceDay:', lastCadenceDay);
 
-        const leadsInCampaign = await this.prisma.leads.count({
-          where: { campaign_id: campaignId },
-        });
-        console.log('[DB] leadsInCampaign:', leadsInCampaign);
+        // const leadsInCampaign = await this.prisma.leads.count({
+        //   where: { campaign_id: campaignId },
+        // });
+        // console.log('[DB] leadsInCampaign:', leadsInCampaign);
 
         const totalAttemptsOnLastDay =
           await this.prisma.cadenceProgress.findFirst({
@@ -457,7 +518,356 @@ export class CadenceService {
       throw error;
     }
   }
+  async executeResumeCadence(campaignId: string): Promise<'completed' | void> {
+    try {
+      console.log('[RESUME-START] executeResumeCadence called with:', {
+        campaignId,
+      });
 
+      const campaign = await this.prisma.campaigns.findUnique({
+        where: { id: campaignId },
+        include: {
+          cadence_template: true,
+        },
+      });
+      console.log('[DB] campaign fetched:', campaign);
+
+      if (!campaign?.cadence_template) {
+        console.log('[INFO] No cadence_template found. Exiting...');
+        return;
+      }
+
+      const { cadence_template } = campaign;
+      console.log('[INFO] cadence_template:', cadence_template);
+
+      const cadenceDays = cadence_template.cadence_days as Record<
+        string,
+        { attempts: number; time_windows: string[] }
+      >;
+      console.log('[INFO] cadenceDays:', cadenceDays);
+
+      const retryDispositions = cadence_template.retry_dispositions;
+      console.log('[INFO] retry_dispositions:', retryDispositions);
+
+      const baseDate = campaign.cadence_resume_from_date;
+      console.log('[INFO] baseDate:', baseDate);
+      if (!baseDate) {
+        console.log('[SKIP] NO Cadence has started today');
+        return;
+      }
+
+      // 🔑 ONLY CHANGE: Calculate resume day based on progress instead of time
+
+      const now = new Date();
+      const ageInHours =
+        (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
+      const ageInDays = ageInHours / 24;
+      const age = Math.floor(ageInDays) + (campaign?.cadence_resume_day || 0);
+      // Convert to integer for day lookup, add 1 for 1-based indexing
+      console.log(
+        '[INFO] age (days since created):',
+        age,
+        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours)`,
+      );
+      console.log(
+        '[INFO] Current time (EST):',
+        now.toLocaleString('en-US', { timeZone: 'America/New_York' }),
+      );
+
+      if (age === null) {
+        console.log('[SKIP] Cadence completed or no valid day.');
+        return 'completed';
+      }
+
+      console.log('[INFO] Resume day calculated:', age);
+
+      const dayConfig = cadenceDays[age.toString()];
+      console.log('[INFO] dayConfig for resume day:', dayConfig);
+
+      if (!dayConfig) {
+        console.log('[SKIP] No cadence config for resume day.');
+        return;
+      }
+
+      const { attempts: maxAttempts, time_windows } = dayConfig;
+      console.log('[INFO] maxAttempts:', maxAttempts);
+      console.log('[INFO] time_windows:', time_windows);
+
+      // Check attempts done for this specific day
+      const attemptsDoneForDay = await this.prisma.cadenceProgress.count({
+        where: {
+          campaign_id: campaignId,
+          cadence_id: cadence_template.id,
+          day: age,
+        },
+      });
+
+      if (attemptsDoneForDay >= maxAttempts) {
+        console.log('[SKIP] Max attempts reached for resume day.');
+        return;
+      }
+
+      // �� REST OF THE METHOD: Use resumeDay instead of age, but keep all logic identical
+      const baseAttemptsPerSlot = Math.floor(maxAttempts / time_windows.length);
+      const extraAttempts = maxAttempts % time_windows.length;
+      console.log('[INFO] baseAttemptsPerSlot:', baseAttemptsPerSlot);
+      console.log('[INFO] extraAttempts:', extraAttempts);
+
+      const attemptDistribution = time_windows.map((_, index) =>
+        index < extraAttempts ? baseAttemptsPerSlot + 1 : baseAttemptsPerSlot,
+      );
+      console.log('[INFO] attemptDistribution:', attemptDistribution);
+
+      let assignedSlot = -1;
+      for (let i = 0; i < time_windows.length; i++) {
+        const timeWindow = time_windows[i];
+        console.log(`[DEBUG] Checking time window ${i}: ${timeWindow}`);
+
+        if (!isNowInTimeWindow(timeWindow)) {
+          console.log(`[SKIP] Current time not in slot ${timeWindow}`);
+          continue;
+        }
+
+        // Check if this slot has any attempts today
+        const attemptsInThisSlot = await this.prisma.cadenceProgress.count({
+          where: {
+            campaign_id: campaignId,
+            cadence_id: cadence_template.id,
+            day: age, // 🔑 Use resumeDay instead of age
+            time_window: timeWindow,
+          },
+        });
+
+        const slotMaxAttempts = attemptDistribution[i];
+        console.log(
+          `[DEBUG] Slot ${timeWindow}: attempts=${attemptsInThisSlot}, max=${slotMaxAttempts}`,
+        );
+
+        if (attemptsInThisSlot >= slotMaxAttempts) {
+          console.log(
+            `[SKIP] Slot ${timeWindow} has reached max attempts (${attemptsInThisSlot}/${slotMaxAttempts})`,
+          );
+          continue;
+        }
+
+        assignedSlot = i;
+        console.log(
+          '[INFO] assignedSlot:',
+          assignedSlot,
+          `for time window: ${timeWindow}`,
+        );
+        break;
+      }
+
+      if (assignedSlot === -1) {
+        console.log(
+          '[SKIP] All time slots filled or not in current time window.',
+        );
+        return;
+      }
+
+      const cadenceProgressCount = await this.prisma.cadenceProgress.count({
+        where: {
+          campaign_id: campaignId,
+          cadence_id: cadence_template.id,
+        },
+      });
+      console.log('[DB] cadenceProgressCount:', cadenceProgressCount);
+
+      const isFirstCadenceExecution = cadenceProgressCount === 0;
+      console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
+
+      const leads = await this.prisma.leads.findMany({
+        where: {
+          campaign_id: campaignId,
+          ...(isFirstCadenceExecution
+            ? { status: 'Pending' }
+            : { disposition: { in: retryDispositions } }),
+        },
+      });
+      console.log('[DB] leads fetched:', leads);
+
+      let hasRetried = false;
+      if (leads.length === 0) {
+        console.log('[STOP] No leads found for this cadence run. Exiting...');
+        return;
+      }
+
+      for (const lead of leads) {
+        console.log('\n[LOOP] Processing lead:', lead);
+        if (isFirstCadenceExecution) {
+          console.log('[ACTION] Triggering normal call...');
+          try {
+            await this.triggerCallService.triggerCall({ leadId: lead.id });
+            console.log('[SUCCESS] Normal call triggered for lead:', lead.id);
+          } catch (error) {
+            console.error(
+              '[ERROR] Failed to trigger normal call for lead:',
+              lead.id,
+              error,
+            );
+          }
+        } else {
+          console.log('[ACTION] Triggering cadence call...');
+          try {
+            await this.triggerCallService.triggerCallForCadence(lead);
+            console.log('[SUCCESS] Cadence call triggered for lead:', lead.id);
+          } catch (error) {
+            console.error(
+              '[ERROR] Failed to trigger cadence call for lead:',
+              lead.id,
+              error,
+            );
+          }
+        }
+        await new Promise((res) => setTimeout(res, 2000));
+        hasRetried = true;
+      }
+
+      // Record progress using resumeDay
+      const newProgress = await this.prisma.cadenceProgress.create({
+        data: {
+          campaign_id: campaignId,
+          cadence_id: cadence_template.id,
+          day: age, // 🔑 Use resumeDay instead of age
+          attempt: attemptsDoneForDay + 1,
+          time_window: time_windows[assignedSlot],
+        },
+      });
+      console.log('[DB] cadenceProgress created:', newProgress);
+
+      // Check completion logic
+      if (!hasRetried) {
+        const lastCadenceDay = Math.max(
+          ...Object.keys(cadenceDays).map((k) => parseInt(k)),
+        );
+        console.log('[INFO] lastCadenceDay:', lastCadenceDay);
+
+        const leadsInCampaign = await this.prisma.leads.count({
+          where: { campaign_id: campaignId },
+        });
+        console.log('[DB] leadsInCampaign:', leadsInCampaign);
+
+        const totalAttemptsOnLastDay =
+          await this.prisma.cadenceProgress.findFirst({
+            where: {
+              campaign_id: campaignId,
+              cadence_id: cadence_template.id,
+              day: lastCadenceDay,
+            },
+            orderBy: { executed_at: 'desc' },
+            select: { attempt: true },
+          });
+        console.log('[DB] totalAttemptsOnLastDay:', totalAttemptsOnLastDay);
+
+        if (
+          totalAttemptsOnLastDay?.attempt ??
+          0 >= cadenceDays[lastCadenceDay].attempts
+        ) {
+          const updatedCampaign = await this.prisma.campaigns.update({
+            where: { id: campaignId },
+            data: { cadence_completed: true },
+          });
+          console.log('[DB] Campaign marked completed:', updatedCampaign);
+          return 'completed';
+        }
+      }
+
+      console.log('[END] executeResumeCadence completed.');
+    } catch (error) {
+      console.error('[ERROR] executeResumeCadence failed:', error);
+      throw error;
+    }
+  }
+
+  // 🔑 NEW METHOD: Calculate resume day based on progress
+  private async calculateResumeDay(
+    campaignId: string,
+    cadenceDays: Record<string, { attempts: number; time_windows: string[] }>,
+    cadenceTemplateId: string | undefined,
+    baseDate: Date,
+    resume_day: number, // 🔑 Need baseDate to calculate age
+  ): Promise<number | null> {
+    try {
+      console.log(
+        `[RESUME-DEBUG] Calculating resume day for campaign ${campaignId}`,
+      );
+
+      // Get the latest progress for this campaign
+      const latestProgress = await this.prisma.cadenceProgress.findFirst({
+        where: { campaign_id: campaignId, cadence_id: cadenceTemplateId },
+        orderBy: { executed_at: 'desc' },
+      });
+
+      if (!latestProgress) {
+        // No progress yet, start from day 1
+        console.log('[RESUME-INFO] No progress found, starting from Day 1');
+        return 1;
+      }
+
+      const lastDay = latestProgress.day;
+      const lastAttempt = latestProgress.attempt;
+      const dayConfig = cadenceDays[lastDay.toString()];
+
+      console.log(
+        `[RESUME-DEBUG] Last progress: Day ${lastDay}, Attempt ${lastAttempt}`,
+      );
+
+      if (!dayConfig) {
+        console.log(`[RESUME-ERROR] No config found for day ${lastDay}`);
+        return null;
+      }
+
+      // 🔑 FORMULA LOGIC: Calculate age from original start date
+      const today = new Date();
+      const ageInHours =
+        (today.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
+      const ageInDays = ageInHours / 24;
+      const age = Math.floor(ageInDays) + 1;
+
+      console.log(`[RESUME-DEBUG] Age from start date: ${age}`);
+      console.log(
+        `[RESUME-DEBUG] Last day: ${lastDay}, Last attempt: ${lastAttempt}/${dayConfig.attempts}`,
+      );
+
+      // Check if attempts are done on the same day
+      const attemptsDoneOnSameDay = lastAttempt >= dayConfig.attempts;
+
+      // 🔑 FORMULA CALCULATION
+      let resumeDay: number;
+
+      if (attemptsDoneOnSameDay) {
+        // Attempts ARE done on same day: age + 1 + resumeDay
+        resumeDay = age + 1 + resume_day;
+        console.log(
+          `[RESUME-INFO] Attempts completed on same day. Formula: ${age} + 1 + ${lastDay} = ${resumeDay}`,
+        );
+      } else {
+        // Attempts are NOT done on same day: age + resumeDay
+        resumeDay = age + lastDay;
+        console.log(
+          `[RESUME-INFO] Attempts not completed on same day. Formula: ${age} + ${lastDay} = ${resumeDay}`,
+        );
+      }
+
+      console.log(`[RESUME-INFO] Calculated resume day: ${resumeDay}`);
+
+      // 🔑 VALIDATION: Check if calculated day exists in cadence config
+      if (cadenceDays[resumeDay.toString()]) {
+        console.log(
+          `[RESUME-INFO] Resume day ${resumeDay} found in cadence config ✅`,
+        );
+        return resumeDay;
+      }
+      return null;
+    } catch (error) {
+      this.logger.error(
+        `Error calculating resume day for campaign ${campaignId}:`,
+        error,
+      );
+      return null;
+    }
+  }
   async createCadenceTemplate(input: {
     userId: string;
     name: string;
@@ -633,7 +1043,7 @@ export class CadenceService {
           created_at: 'desc',
         },
       });
-
+      console.log({ templates });
       return {
         userError: null,
         templates,
@@ -856,6 +1266,113 @@ export class CadenceService {
       return {
         userError: { message: 'Failed to fetch campaign cadence count' },
         data: null,
+      };
+    }
+  }
+  async stopCadence(campaignId: string) {
+    try {
+      const campaign = await this.prisma.campaigns.findUnique({
+        where: { id: campaignId },
+        include: {
+          cadence_template: true,
+          cadence_progress: {
+            orderBy: { executed_at: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!campaign) {
+        return {
+          success: false,
+          userError: { message: 'Campaign not found' },
+        };
+      }
+
+      if (!campaign.cadence_template_id) {
+        return {
+          success: false,
+          userError: { message: 'This campaign has no cadence attached' },
+        };
+      }
+
+      // 🔑 NEW: Capture current state when stopping
+      let resumeDay = 1;
+      if (campaign.cadence_progress && campaign.cadence_progress.length > 0) {
+        const latestProgress = campaign.cadence_progress[0];
+        resumeDay = latestProgress.day;
+      }
+
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          cadence_stopped: true,
+          cadence_paused_at: new Date(),
+          cadence_resume_day: resumeDay,
+        },
+      });
+
+      return {
+        success: true,
+        userError: null,
+      };
+    } catch (error) {
+      console.error('[StopCadence] Error:', error);
+      return {
+        success: false,
+        userError: {
+          message: 'Internal server error. Please try again later.',
+        },
+      };
+    }
+  }
+  async resumeCadence(campaignId: string) {
+    try {
+      const campaign = await this.prisma.campaigns.findUnique({
+        where: { id: campaignId },
+      });
+
+      if (!campaign) {
+        return {
+          success: false,
+          userError: { message: 'Campaign not found' },
+        };
+      }
+
+      if (!campaign.cadence_template_id) {
+        return {
+          success: false,
+          userError: { message: 'This campaign has no cadence attached' },
+        };
+      }
+
+      if (!campaign.cadence_stopped) {
+        return {
+          success: false,
+          userError: { message: 'Cadence is not stopped' },
+        };
+      }
+
+      // 🔑 NEW: Set resume date to today (not the original start date)
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: {
+          cadence_stopped: false,
+          cadence_resume_from_date: new Date(), // Today becomes the new "start date"
+        },
+      });
+
+      return {
+        success: true,
+        userError: null,
+      };
+    } catch (error) {
+      console.error('[ResumeCadence] Error:', error);
+      return {
+        success: false,
+        userError: {
+          message: 'Internal server error. Please try again later.',
+        },
       };
     }
   }

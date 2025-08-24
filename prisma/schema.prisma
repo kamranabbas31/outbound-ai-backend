@@ -37,6 +37,10 @@ model Campaigns {
   failed              Int
   duration            Float
   cost                Float
+  resume_campaign_cadence Boolean         @default(false)
+  cadence_paused_at   DateTime?          
+  cadence_resume_from_date DateTime?    
+  cadence_resume_day  Int? 
   created_at          DateTime           @default(now())
   execution_status    String
   user_id             String

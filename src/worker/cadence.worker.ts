@@ -23,11 +23,15 @@ async function bootstrapCadenceWorker() {
     const worker = new Worker(
       'cadence-queue',
       async (job) => {
-        const { campaignId } = job.data;
+        const { campaignId, resumeCadence } = job.data;
         console.log(`Processing cadence for campaign ${campaignId}`);
 
         try {
-          await cadenceService.executeCampaignCadence(campaignId);
+          if (resumeCadence === 'false') {
+            await cadenceService.executeCampaignCadence(campaignId);
+          } else {
+            await cadenceService.executeResumeCadence(campaignId);
+          }
         } catch (err) {
           console.error(
             `Cadence execution failed for ${campaignId}:`,
