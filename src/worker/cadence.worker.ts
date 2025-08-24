@@ -44,11 +44,11 @@ async function bootstrapCadenceWorker() {
         console.log(
           `Processing cadence for campaign ${campaignId}, attempt ${job.attemptsMade + 1}`,
         );
-        console.log({ resumeCadence });
+        console.log({ resumeCadence, type: typeof resumeCadence });
         try {
           // Add timeout for job execution
           const executionPromise =
-            resumeCadence == 'false'
+            resumeCadence === false
               ? cadenceService.executeCampaignCadence(campaignId)
               : cadenceService.executeResumeCadence(campaignId);
 
