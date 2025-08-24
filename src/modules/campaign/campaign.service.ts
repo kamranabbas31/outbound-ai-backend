@@ -23,6 +23,11 @@ export class CampaignsService {
     this.queue = new Queue('campaignQueue', {
       connection: redis,
     });
+
+    // Add queue error handlers
+    this.queue.on('error', (error) => {
+      console.error(`Campaign queue error: ${error.message}`, error.stack);
+    });
   }
 
   async createCampaign(

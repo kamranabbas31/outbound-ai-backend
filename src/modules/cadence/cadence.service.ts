@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { differenceInCalendarDays } from 'date-fns';
 import { TriggerCallService } from '../call/trigger-call.service';
 import { Queue } from 'bullmq';
-import { redisConfig } from 'src/utils/redis';
+import { redisConfig, redis } from 'src/utils/redis';
 import { isNowInTimeWindow } from 'src/utils/helper';
 import { ActivityType } from '@prisma/client';
 
@@ -22,11 +22,51 @@ export class CadenceService {
     this.cadenceQueue = new Queue(this.QUEUE_NAME, {
       connection: redisConfig,
     });
+
+    // Add queue error handlers
+    this.cadenceQueue.on('error', (error) => {
+      this.logger.error(`Cadence queue error: ${error.message}`, error.stack);
+    });
+
+    this.cadenceQueue.on('waiting', (job) => {
+      this.logger.debug(`Job ${job.id} is waiting`);
+    });
+
+    this.cadenceQueue.on('progress', (job, progress) => {
+      this.logger.debug(`Job ${job.id} is ${progress}% complete`);
+    });
+
+    this.cadenceQueue.on('removed', (job) => {
+      this.logger.debug(`Job ${job.id} removed`);
+    });
   }
 
-  @Cron('0 */25 * * * *') // Run every 25 minutes
+  /**
+   * Check Redis connection health
+   */
+  private async checkRedisHealth(): Promise<void> {
+    try {
+      await redis.ping();
+      this.logger.debug('Redis health check passed');
+    } catch (error) {
+      this.logger.error('Redis health check failed', error.stack);
+      throw error;
+    }
+  }
+
+  @Cron('0 */01 * * * *') // Run every 25 minutes
   async handleCadenceExecution() {
-    this.logger.log('Checking cadence campaigns...');
+    try {
+      // Check Redis connection before proceeding
+      await this.checkRedisHealth();
+      this.logger.log('Checking cadence campaigns...');
+    } catch (error) {
+      this.logger.error(
+        'Failed to execute cadence: Redis connection issue',
+        error.stack,
+      );
+      return;
+    }
 
     // Step 1: Get campaigns that are *potentially* eligible
     const campaigns = await this.prisma.campaigns.findMany({
@@ -176,6 +216,10 @@ export class CadenceService {
     }
 
     this.logger.log(`Cadence jobs queued: ${queuedCount}`);
+  }
+  catch(error) {
+    this.logger.error('Error in handleCadenceExecution:', error.stack);
+    throw error;
   }
 
   async executeCampaignCadence(
