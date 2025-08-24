@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { Campaigns } from '@prisma/client';
 import { Queue } from 'bullmq';
-import { redis } from 'src/utils/redis';
+import { redisConfig } from 'src/utils/redis';
 import { UpdateCampaignInput } from './dto/update-campaign.input';
 import { ActivityType } from 'src/graphql';
 import { TriggerCallService } from '../call/trigger-call.service';
@@ -21,7 +21,7 @@ export class CampaignsService {
     private readonly triggerCallService: TriggerCallService,
   ) {
     this.queue = new Queue('campaignQueue', {
-      connection: redis,
+      connection: redisConfig,
     });
 
     // Add queue error handlers

@@ -206,11 +206,23 @@ export class CadenceService {
           continue;
         }
       }
-      // Step 4: Queue it
-      await this.cadenceQueue.add('execute-cadence', {
-        campaignId: campaign.id,
-        resumeCadence: campaign.resume_campaign_cadence,
-      });
+      // Step 4: Queue it with retry options
+      await this.cadenceQueue.add(
+        'execute-cadence',
+        {
+          campaignId: campaign.id,
+          resumeCadence: campaign.resume_campaign_cadence,
+        },
+        {
+          attempts: 3, // Retry failed jobs up to 3 times
+          backoff: {
+            type: 'exponential',
+            delay: 5000, // Start with 5 second delay
+          },
+          removeOnComplete: 5, // Keep only 5 completed jobs
+          removeOnFail: 10, // Keep only 10 failed jobs
+        },
+      );
 
       queuedCount++;
     }

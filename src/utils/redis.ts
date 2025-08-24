@@ -16,8 +16,9 @@ const createRedisConnection = (): Redis => {
     enableReadyCheck: false,
     lazyConnect: true,
     keepAlive: 30000,
-    connectTimeout: 10000,
-    commandTimeout: 5000,
+    connectTimeout: 60000, // Increased from 10s to 60s
+    commandTimeout: 30000, // Increased from 5s to 30s
+    family: 4, // Force IPv4
   });
 
   // Add event handlers for connection management
@@ -44,6 +45,12 @@ const createRedisConnection = (): Redis => {
   redis.on('end', () => {
     console.log('🔚 Redis connection ended');
     redisInstance = null; // Reset singleton
+
+    // Attempt to reconnect after a delay
+    setTimeout(() => {
+      console.log('🔄 Attempting to recreate Redis connection...');
+      redisInstance = createRedisConnection();
+    }, 5000);
   });
 
   return redis;
@@ -68,8 +75,9 @@ export const redisConfig: RedisOptions = {
   enableReadyCheck: false,
   lazyConnect: true,
   keepAlive: 30000,
-  connectTimeout: 10000,
-  commandTimeout: 5000,
+  connectTimeout: 60000, // Increased timeout
+  commandTimeout: 30000, // Increased timeout
+  family: 4, // Force IPv4
 };
 
 // Alternative URL (recommended for Upstash)

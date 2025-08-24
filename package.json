@@ -18,8 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "worker": "ts-node -r tsconfig-paths/register src/worker/worker.ts --watch",
-    "worker:cadence": "ts-node -r tsconfig-paths/register src/worker/cadence.worker.ts --watch"
+      "worker": "ts-node -r tsconfig-paths/register src/worker/cadence.worker.ts --watch"
   },
   "dependencies": {
     "@apollo/server": "^4.1.1",
