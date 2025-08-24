@@ -54,7 +54,7 @@ export class CadenceService {
     }
   }
 
-  @Cron('0 */01 * * * *') // Run every 25 minutes
+  @Cron('0 */25 * * * *') // Run every 25 minutes
   async handleCadenceExecution() {
     try {
       // Check Redis connection before proceeding
