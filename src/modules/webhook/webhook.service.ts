@@ -274,7 +274,7 @@ export class WebhookService {
               completed: actualCompleted,
               in_progress: actualInProgress,
               failed: actualFailed,
-              remaining: Math.max(0, actualRemaining),
+              // remaining: Math.max(0, actualRemaining),
             },
           });
           console.log('🔧 Auto-fixed campaign stats imbalance:', {
