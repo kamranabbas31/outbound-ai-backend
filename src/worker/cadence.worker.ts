@@ -80,7 +80,7 @@ async function bootstrapCadenceWorker() {
         connection: {
           ...redisConfig,
           // Worker-specific Redis settings
-          maxRetriesPerRequest: 3,
+          maxRetriesPerRequest: 2,
           lazyConnect: true,
           // Increase timeouts for job processing
           connectTimeout: 30000,
