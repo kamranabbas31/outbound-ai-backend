@@ -488,13 +488,28 @@ export class CadenceService {
         return;
       }
 
+      // ✅ Track leads processed in this execution cycle
+      const processedLeadIdsInThisCycle = new Set<string>();
+
       for (const lead of leads) {
         console.log('\n[LOOP] Processing lead:', lead);
+
+        // ✅ Check if this lead was already processed in this execution cycle
+        if (processedLeadIdsInThisCycle.has(lead.id)) {
+          console.log(
+            `[SKIP] Lead ${lead.id} already processed in this cycle, skipping...`,
+          );
+          continue; // Skip to next lead
+        }
+
         if (isFirstCadenceExecution) {
           console.log('[ACTION] Triggering normal call...');
           try {
             await this.triggerCallService.triggerCall({ leadId: lead.id });
             console.log('[SUCCESS] Normal call triggered for lead:', lead.id);
+
+            // ✅ Mark this lead as processed
+            processedLeadIdsInThisCycle.add(lead.id);
           } catch (err) {
             if (err?.response?.status === 429) {
               this.logger.warn(
@@ -511,6 +526,9 @@ export class CadenceService {
           try {
             await this.triggerCallService.triggerCallForCadence(lead);
             console.log('[SUCCESS] Cadence call triggered for lead:', lead.id);
+
+            // ✅ Mark this lead as processed
+            processedLeadIdsInThisCycle.add(lead.id);
           } catch (err) {
             if (err?.response?.status === 429) {
               this.logger.warn(
