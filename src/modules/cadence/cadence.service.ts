@@ -75,6 +75,7 @@ export class CadenceService {
         cadence_stopped: false,
         cadence_completed: false,
         cadence_start_date: { not: null, lte: new Date() },
+        execution_status: 'idle',
       },
       select: {
         id: true,
@@ -250,7 +251,12 @@ export class CadenceService {
         },
       });
       console.log('[DB] campaign fetched:', campaign);
-
+      // Update campaign execution status to 'executing'
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'executing' },
+      });
+      console.log('[DB] Campaign execution_status updated to "executing"');
       if (!campaign?.cadence_template) {
         console.log('[INFO] No cadence_template found. Exiting...');
         console.log('[SUMMARY] Campaign cadence execution summary:');
@@ -261,6 +267,10 @@ export class CadenceService {
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
         console.log(`  - Status: No cadence template found`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -288,6 +298,10 @@ export class CadenceService {
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
         console.log(`  - Status: No cadence start date`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -320,6 +334,10 @@ export class CadenceService {
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
         console.log(`  - Status: No cadence config for today`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -352,6 +370,10 @@ export class CadenceService {
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
         console.log(`  - Status: Max attempts reached for today`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -418,6 +440,11 @@ export class CadenceService {
         console.log(`  - Leads processed: 0`);
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
+        console.log('[DB] Campaign execution_status updated to "completed"');
         return;
       }
       const cadenceProgressCount = await this.prisma.cadenceProgress.count({
@@ -454,6 +481,10 @@ export class CadenceService {
         console.log(`  - Calls triggered: No`);
         console.log(`  - Progress recorded: No`);
         console.log(`  - Status: No leads found for cadence run`);
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -535,7 +566,10 @@ export class CadenceService {
             data: { cadence_completed: true },
           });
           console.log('[DB] Campaign marked completed:', updatedCampaign);
-
+          await this.prisma.campaigns.update({
+            where: { id: campaignId },
+            data: { execution_status: 'idle' },
+          });
           this.logger.log(`[CADENCE COMPLETED] Campaign ${campaignId}`);
           console.log('[SUMMARY] Campaign cadence execution summary:');
           console.log(`  - Campaign ID: ${campaignId}`);
@@ -548,7 +582,10 @@ export class CadenceService {
           return 'completed';
         }
       }
-
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'idle' },
+      });
       console.log('[END] executeCampaignCadence completed.');
       console.log('[SUMMARY] Campaign cadence execution summary:');
       console.log(`  - Campaign ID: ${campaignId}`);
@@ -559,6 +596,10 @@ export class CadenceService {
       console.log(`  - Progress recorded: Yes`);
       console.log(`  - Status: Normal completion`);
     } catch (error) {
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'idle' },
+      });
       console.error('[ERROR] executeCampaignCadence failed:', error);
       console.log('[SUMMARY] Campaign cadence execution summary:');
       console.log(`  - Campaign ID: ${campaignId}`);
@@ -587,10 +628,18 @@ export class CadenceService {
           cadence_template: true,
         },
       });
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'executing' },
+      });
       console.log('[DB] campaign fetched:', campaign);
 
       if (!campaign?.cadence_template) {
         console.log('[INFO] No cadence_template found. Exiting...');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -610,6 +659,10 @@ export class CadenceService {
       console.log('[INFO] baseDate:', baseDate);
       if (!baseDate) {
         console.log('[SKIP] NO Cadence has started today');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -633,6 +686,10 @@ export class CadenceService {
 
       if (age === null) {
         console.log('[SKIP] Cadence completed or no valid day.');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return 'completed';
       }
 
@@ -643,6 +700,10 @@ export class CadenceService {
 
       if (!dayConfig) {
         console.log('[SKIP] No cadence config for resume day.');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -661,6 +722,10 @@ export class CadenceService {
 
       if (attemptsDoneForDay >= maxAttempts) {
         console.log('[SKIP] Max attempts reached for resume day.');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -720,6 +785,10 @@ export class CadenceService {
         console.log(
           '[SKIP] All time slots filled or not in current time window.',
         );
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -747,6 +816,10 @@ export class CadenceService {
       let hasRetried = false;
       if (leads.length === 0) {
         console.log('[STOP] No leads found for this cadence run. Exiting...');
+        await this.prisma.campaigns.update({
+          where: { id: campaignId },
+          data: { execution_status: 'idle' },
+        });
         return;
       }
 
@@ -792,7 +865,10 @@ export class CadenceService {
         },
       });
       console.log('[DB] cadenceProgress created:', newProgress);
-
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'idle' },
+      });
       // Check completion logic
       if (!hasRetried) {
         const lastCadenceDay = Math.max(
@@ -829,7 +905,10 @@ export class CadenceService {
           return 'completed';
         }
       }
-
+      await this.prisma.campaigns.update({
+        where: { id: campaignId },
+        data: { execution_status: 'idle' },
+      });
       console.log('[END] executeResumeCadence completed.');
     } catch (error) {
       console.error('[ERROR] executeResumeCadence failed:', error);
