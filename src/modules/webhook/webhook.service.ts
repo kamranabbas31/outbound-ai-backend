@@ -252,7 +252,8 @@ export class WebhookService {
           const actualFailed =
             actualStats.find((s) => s.status === 'Failed')?._count.status || 0;
           const actualRemaining =
-            totalLeadsCount - actualCompleted - actualInProgress - actualFailed;
+            actualStats.find((s) => s.status === 'Pending')?._count.status || 0;
+
           // Update campaign status based on lead distribution
           let campaignStatus: string = 'InProgress';
 
@@ -274,7 +275,7 @@ export class WebhookService {
               completed: actualCompleted,
               in_progress: actualInProgress,
               failed: actualFailed,
-              // remaining: Math.max(0, actualRemaining),
+              remaining: Math.max(0, actualRemaining),
             },
           });
           console.log('🔧 Auto-fixed campaign stats imbalance:', {
