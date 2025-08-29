@@ -495,27 +495,35 @@ export class CadenceService {
           try {
             await this.triggerCallService.triggerCall({ leadId: lead.id });
             console.log('[SUCCESS] Normal call triggered for lead:', lead.id);
-          } catch (error) {
-            console.error(
-              '[ERROR] Failed to trigger normal call for lead:',
-              lead.id,
-              error,
-            );
+          } catch (err) {
+            if (err?.response?.status === 429) {
+              this.logger.warn(
+                `Rate limited by Vapi. Waiting 5s before retry...`,
+              );
+              await new Promise((res) => setTimeout(res, 5000));
+              await this.triggerCallService.triggerCall({ leadId: lead.id }); // retry once
+            } else {
+              throw err;
+            }
           }
         } else {
           console.log('[ACTION] Triggering cadence call...');
           try {
             await this.triggerCallService.triggerCallForCadence(lead);
             console.log('[SUCCESS] Cadence call triggered for lead:', lead.id);
-          } catch (error) {
-            console.error(
-              '[ERROR] Failed to trigger cadence call for lead:',
-              lead.id,
-              error,
-            );
+          } catch (err) {
+            if (err?.response?.status === 429) {
+              this.logger.warn(
+                `Rate limited by Vapi. Waiting 5s before retry...`,
+              );
+              await new Promise((res) => setTimeout(res, 5000));
+              await this.triggerCallService.triggerCallForCadence(lead); // retry once
+            } else {
+              throw err;
+            }
           }
         }
-        await new Promise((res) => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 5000));
         hasRetried = true;
       }
       const newProgress = await this.prisma.cadenceProgress.create({
