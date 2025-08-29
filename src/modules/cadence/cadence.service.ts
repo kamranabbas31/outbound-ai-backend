@@ -465,6 +465,7 @@ export class CadenceService {
             ? { status: 'Pending' }
             : { disposition: { in: retryDispositions } }),
         },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       });
       console.log('[DB] leads fetched:', leads);
       console.log('[INFO] isFirstCadenceExecution:', isFirstCadenceExecution);
@@ -836,6 +837,7 @@ export class CadenceService {
             ? { status: 'Pending' }
             : { disposition: { in: retryDispositions } }),
         },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       });
       console.log('[DB] leads fetched:', leads);
 
