@@ -250,12 +250,13 @@ export class CadenceService {
           cadence_template: true,
         },
       });
-      console.log('[DB] campaign fetched:', campaign);
-      // Update campaign execution status to 'executing'
       await this.prisma.campaigns.update({
         where: { id: campaignId },
         data: { execution_status: 'executing' },
       });
+      console.log('[DB] campaign fetched:', campaign);
+      // Update campaign execution status to 'executing'
+
       console.log('[DB] Campaign execution_status updated to "executing"');
       if (!campaign?.cadence_template) {
         console.log('[INFO] No cadence_template found. Exiting...');
@@ -545,8 +546,8 @@ export class CadenceService {
         await new Promise((res) => setTimeout(res, 5000));
         hasRetried = true;
       }
-      const newProgress = await this.prisma.cadenceProgress.create({
-        data: {
+      const existingProgress = await this.prisma.cadenceProgress.findFirst({
+        where: {
           campaign_id: campaignId,
           cadence_id: cadence_template.id,
           day: age,
@@ -554,7 +555,26 @@ export class CadenceService {
           time_window: time_windows[assignedSlot],
         },
       });
-      console.log('[DB] cadenceProgress created:', newProgress);
+
+      if (existingProgress) {
+        console.log(
+          '[INFO] Progress already exists for this campaign/day/time window, skipping creation',
+        );
+      } else {
+        // ✅ Create new progress only if it doesn't exist
+        const newProgress = await this.prisma.cadenceProgress.create({
+          data: {
+            campaign_id: campaignId,
+            cadence_id: cadence_template.id,
+            day: age,
+            attempt: attemptsDoneToday + 1,
+            time_window: time_windows[assignedSlot],
+          },
+        });
+        console.log('[DB] cadenceProgress created:', newProgress);
+      }
+      console.log('[DB] cadenceProgress exist :', existingProgress);
+
       console.log(
         '[INFO] Progress recorded for day:',
         age,
@@ -590,13 +610,10 @@ export class CadenceService {
         ) {
           const updatedCampaign = await this.prisma.campaigns.update({
             where: { id: campaignId },
-            data: { cadence_completed: true },
+            data: { cadence_completed: true, execution_status: 'idle' },
           });
           console.log('[DB] Campaign marked completed:', updatedCampaign);
-          await this.prisma.campaigns.update({
-            where: { id: campaignId },
-            data: { execution_status: 'idle' },
-          });
+
           this.logger.log(`[CADENCE COMPLETED] Campaign ${campaignId}`);
           console.log('[SUMMARY] Campaign cadence execution summary:');
           console.log(`  - Campaign ID: ${campaignId}`);
@@ -883,16 +900,33 @@ export class CadenceService {
       }
 
       // Record progress using resumeDay
-      const newProgress = await this.prisma.cadenceProgress.create({
-        data: {
+      const existingProgress = await this.prisma.cadenceProgress.findFirst({
+        where: {
           campaign_id: campaignId,
           cadence_id: cadence_template.id,
-          day: age, // 🔑 Use resumeDay instead of age
-          attempt: attemptsDoneForDay + 1,
+          day: age,
           time_window: time_windows[assignedSlot],
         },
       });
-      console.log('[DB] cadenceProgress created:', newProgress);
+
+      if (existingProgress) {
+        console.log(
+          '[INFO] Progress already exists for this campaign/day/time window, skipping creation',
+        );
+      } else {
+        // ✅ Create new progress only if it doesn't exist
+        const newProgress = await this.prisma.cadenceProgress.create({
+          data: {
+            campaign_id: campaignId,
+            cadence_id: cadence_template.id,
+            day: age,
+            attempt: attemptsDoneForDay + 1,
+            time_window: time_windows[assignedSlot],
+          },
+        });
+        console.log('[DB] cadenceProgress created:', newProgress);
+      }
+      console.log('[DB] cadenceProgress exist :', existingProgress);
       await this.prisma.campaigns.update({
         where: { id: campaignId },
         data: { execution_status: 'idle' },
@@ -927,7 +961,7 @@ export class CadenceService {
         ) {
           const updatedCampaign = await this.prisma.campaigns.update({
             where: { id: campaignId },
-            data: { cadence_completed: true },
+            data: { cadence_completed: true, execution_status: 'idle' },
           });
           console.log('[DB] Campaign marked completed:', updatedCampaign);
           return 'completed';
@@ -945,93 +979,7 @@ export class CadenceService {
   }
 
   // 🔑 NEW METHOD: Calculate resume day based on progress
-  private async calculateResumeDay(
-    campaignId: string,
-    cadenceDays: Record<string, { attempts: number; time_windows: string[] }>,
-    cadenceTemplateId: string | undefined,
-    baseDate: Date,
-    resume_day: number, // 🔑 Need baseDate to calculate age
-  ): Promise<number | null> {
-    try {
-      console.log(
-        `[RESUME-DEBUG] Calculating resume day for campaign ${campaignId}`,
-      );
 
-      // Get the latest progress for this campaign
-      const latestProgress = await this.prisma.cadenceProgress.findFirst({
-        where: { campaign_id: campaignId, cadence_id: cadenceTemplateId },
-        orderBy: { executed_at: 'desc' },
-      });
-
-      if (!latestProgress) {
-        // No progress yet, start from day 1
-        console.log('[RESUME-INFO] No progress found, starting from Day 1');
-        return 1;
-      }
-
-      const lastDay = latestProgress.day;
-      const lastAttempt = latestProgress.attempt;
-      const dayConfig = cadenceDays[lastDay.toString()];
-
-      console.log(
-        `[RESUME-DEBUG] Last progress: Day ${lastDay}, Attempt ${lastAttempt}`,
-      );
-
-      if (!dayConfig) {
-        console.log(`[RESUME-ERROR] No config found for day ${lastDay}`);
-        return null;
-      }
-
-      // 🔑 FORMULA LOGIC: Calculate age from original start date
-      const today = new Date();
-      const ageInHours =
-        (today.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
-      const ageInDays = ageInHours / 24;
-      const age = Math.floor(ageInDays) + 1;
-
-      console.log(`[RESUME-DEBUG] Age from start date: ${age}`);
-      console.log(
-        `[RESUME-DEBUG] Last day: ${lastDay}, Last attempt: ${lastAttempt}/${dayConfig.attempts}`,
-      );
-
-      // Check if attempts are done on the same day
-      const attemptsDoneOnSameDay = lastAttempt >= dayConfig.attempts;
-
-      // 🔑 FORMULA CALCULATION
-      let resumeDay: number;
-
-      if (attemptsDoneOnSameDay) {
-        // Attempts ARE done on same day: age + 1 + resumeDay
-        resumeDay = age + 1 + resume_day;
-        console.log(
-          `[RESUME-INFO] Attempts completed on same day. Formula: ${age} + 1 + ${lastDay} = ${resumeDay}`,
-        );
-      } else {
-        // Attempts are NOT done on same day: age + resumeDay
-        resumeDay = age + lastDay;
-        console.log(
-          `[RESUME-INFO] Attempts not completed on same day. Formula: ${age} + ${lastDay} = ${resumeDay}`,
-        );
-      }
-
-      console.log(`[RESUME-INFO] Calculated resume day: ${resumeDay}`);
-
-      // 🔑 VALIDATION: Check if calculated day exists in cadence config
-      if (cadenceDays[resumeDay.toString()]) {
-        console.log(
-          `[RESUME-INFO] Resume day ${resumeDay} found in cadence config ✅`,
-        );
-        return resumeDay;
-      }
-      return null;
-    } catch (error) {
-      this.logger.error(
-        `Error calculating resume day for campaign ${campaignId}:`,
-        error,
-      );
-      return null;
-    }
-  }
   async createCadenceTemplate(input: {
     userId: string;
     name: string;
