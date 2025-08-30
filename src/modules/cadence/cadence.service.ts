@@ -14,6 +14,7 @@ export class CadenceService {
   private readonly logger = new Logger(CadenceService.name);
   private cadenceQueue: Queue;
   private readonly QUEUE_NAME = 'cadence-queue';
+  private readonly executingCampaigns = new Set<string>(); // Track executing campaigns
 
   constructor(
     private readonly prisma: PrismaService,
@@ -216,7 +217,7 @@ export class CadenceService {
           resumeCadence: campaign.resume_campaign_cadence,
         },
         {
-          attempts: 3, // Retry failed jobs up to 3 times
+          attempts: 1, // Retry failed jobs only once
           backoff: {
             type: 'exponential',
             delay: 5000, // Start with 5 second delay
@@ -243,6 +244,17 @@ export class CadenceService {
       console.log('[START] executeCampaignCadence called with:', {
         campaignId,
       });
+
+      // ✅ Check if campaign is already executing
+      if (this.executingCampaigns.has(campaignId)) {
+        console.log(
+          `[SKIP] Campaign ${campaignId} is already executing, skipping...`,
+        );
+        return;
+      }
+
+      // ✅ Mark campaign as executing
+      this.executingCampaigns.add(campaignId);
 
       const campaign = await this.prisma.campaigns.findUnique({
         where: { id: campaignId },
@@ -658,6 +670,12 @@ export class CadenceService {
         error,
       );
       throw error;
+    } finally {
+      // ✅ Always cleanup executing campaign tracking
+      this.executingCampaigns.delete(campaignId);
+      console.log(
+        `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+      );
     }
   }
   async executeResumeCadence(campaignId: string): Promise<'completed' | void> {
@@ -665,6 +683,17 @@ export class CadenceService {
       console.log('[RESUME-START] executeResumeCadence called with:', {
         campaignId,
       });
+
+      // ✅ Check if campaign is already executing
+      if (this.executingCampaigns.has(campaignId)) {
+        console.log(
+          `[SKIP] Campaign ${campaignId} is already executing, skipping...`,
+        );
+        return;
+      }
+
+      // ✅ Mark campaign as executing
+      this.executingCampaigns.add(campaignId);
 
       const campaign = await this.prisma.campaigns.findUnique({
         where: { id: campaignId },
@@ -975,6 +1004,12 @@ export class CadenceService {
     } catch (error) {
       console.error('[ERROR] executeResumeCadence failed:', error);
       throw error;
+    } finally {
+      // ✅ Always cleanup executing campaign tracking
+      this.executingCampaigns.delete(campaignId);
+      console.log(
+        `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+      );
     }
   }
 
