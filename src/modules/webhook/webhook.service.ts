@@ -44,10 +44,12 @@ export class WebhookService {
       recordingUrl,
       cost,
     });
-
     let leadId = contactId;
     let campaignId: string | null = null;
-
+    if (!phoneNumber) {
+      console.log('⚠️ No phone number found');
+      return;
+    }
     if (!leadId && phoneNumber) {
       const lead = await this.prisma.leads.findFirst({
         where: { phone_number: phoneNumber },

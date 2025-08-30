@@ -49,6 +49,7 @@ export function extractContactId(payload) {
   // Existing conditions
   if (payload.metadata?.contactId) {
     console.log('✅ Found contactId in metadata:', payload.metadata.contactId);
+
     return payload.metadata.contactId;
   }
   if (payload.message?.artifact?.assistantOverrides?.metadata?.contactId) {
@@ -56,7 +57,10 @@ export function extractContactId(payload) {
       '✅ Found contactId in message.artifact.assistantOverrides.metadata:',
       payload.message.artifact.assistantOverrides.metadata.contactId,
     );
-    return payload.message.artifact.assistantOverrides.metadata.contactId;
+    const result =
+      payload.message.artifact.assistantOverrides.metadata.contactId;
+
+    return result;
   }
   if (payload.assistantOverrides?.metadata?.contactId) {
     console.log(
@@ -577,6 +581,13 @@ export function determineCallStatus(payload) {
   ) {
     return 'Failed';
   }
+  const endReason = extractEndReason(payload);
+  if (
+    endReason?.toLowerCase().includes('failed') ||
+    endReason?.toLowerCase().includes('fail')
+  ) {
+    return 'Failed';
+  }
   // Look for specific status indicators
   if (payload.status && typeof payload.status === 'string') {
     if (payload.status.toLowerCase().includes('fail')) {
@@ -590,4 +601,36 @@ export function calculateCallCost(durationMinutes) {
   // $0.99 per minute
   const minuteRate = 0.99;
   return durationMinutes * minuteRate;
+}
+
+export function extractEndReason(payload: any): string | null {
+  const candidates: (string | undefined)[] = [
+    payload?.endedReason,
+    payload?.end_reason,
+    payload?.endReason,
+    payload?.message?.endedReason,
+    payload?.message?.end_reason,
+    payload?.message?.endReason,
+    payload?.message?.artifact?.endedReason,
+    payload?.message?.artifact?.end_reason,
+    payload?.message?.artifact?.endReason,
+    payload?.artifact?.endedReason,
+    payload?.artifact?.end_reason,
+    payload?.artifact?.endReason,
+    payload?.data?.event?.endedReason,
+    payload?.data?.event?.end_reason,
+    payload?.call?.endedReason,
+    payload?.call?.end_reason,
+    payload?.call?.endReason,
+  ];
+
+  const found =
+    candidates.find((v) => typeof v === 'string' && v.trim().length > 0) ||
+    null;
+  if (found) {
+    console.log('✅ Found endReason:', found);
+  } else {
+    console.log('⚠️ No endReason found in payload');
+  }
+  return found;
 }
