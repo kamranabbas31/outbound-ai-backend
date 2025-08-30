@@ -548,7 +548,7 @@ export class CadenceService {
               this.logger.warn(
                 `Rate limited by Vapi. Waiting 5s before retry...`,
               );
-              await new Promise((res) => setTimeout(res, 5000));
+              await new Promise((res) => setTimeout(res, 4000));
               await this.triggerCallService.triggerCallForCadence(lead); // retry once
             } else {
               throw err;
@@ -598,11 +598,6 @@ export class CadenceService {
           ...Object.keys(cadenceDays).map((k) => parseInt(k)),
         );
         console.log('[INFO] lastCadenceDay:', lastCadenceDay);
-
-        // const leadsInCampaign = await this.prisma.leads.count({
-        //   where: { campaign_id: campaignId },
-        // });
-        // console.log('[DB] leadsInCampaign:', leadsInCampaign);
 
         const totalAttemptsOnLastDay =
           await this.prisma.cadenceProgress.findFirst({
@@ -924,7 +919,7 @@ export class CadenceService {
             );
           }
         }
-        await new Promise((res) => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 4000));
         hasRetried = true;
       }
 
