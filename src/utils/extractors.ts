@@ -396,6 +396,8 @@ export function extractDisposition(payload: any): string {
     lowerContent.includes('unavailable') ||
     lowerContent.includes('after the beep') ||
     lowerContent.includes('recording') ||
+    lowerContent.includes('record your message') ||
+    lowerContent.includes('your message') ||
     lowerContent.includes('automated voice messaging system') ||
     lowerContent.includes('automated voice') ||
     (lowerContent.includes('not available') &&
@@ -541,6 +543,17 @@ export function extractDisposition(payload: any): string {
   ) {
     console.log('DISPOSITION: Hang Up detected');
     return 'Hang Up';
+  }
+
+  if (
+    endReason?.toLowerCase().includes('silence-timed-out') ||
+    (lowerContent?.toLowerCase().includes('are you still there') &&
+      !lowerContent.includes('bye') &&
+      !lowerContent.includes('goodbye') &&
+      !lowerContent.includes('bye bye') &&
+      !lowerContent.includes('good bye'))
+  ) {
+    return 'Dead Air';
   }
   // Default fallback with more context
   console.log('DISPOSITION: Using fallback logic');
