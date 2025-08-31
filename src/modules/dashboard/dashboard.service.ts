@@ -92,9 +92,6 @@ export class DashboardService {
             case 'in progress':
               inProgress += count;
               break;
-            case 'failed':
-              failed += count;
-              break;
             case 'pending':
               remaining += count;
               break;
