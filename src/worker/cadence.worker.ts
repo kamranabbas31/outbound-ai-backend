@@ -52,15 +52,7 @@ async function bootstrapCadenceWorker() {
               ? cadenceService.executeCampaignCadence(campaignId)
               : cadenceService.executeResumeCadence(campaignId);
 
-          // Timeout after 2 minutes
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error('Job execution timeout')),
-              120000,
-            ),
-          );
-
-          await Promise.race([executionPromise, timeoutPromise]);
+          await executionPromise;
 
           console.log(
             `✅ Cadence execution completed for campaign ${campaignId}`,

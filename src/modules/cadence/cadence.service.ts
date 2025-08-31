@@ -55,7 +55,7 @@ export class CadenceService {
     }
   }
 
-  @Cron('0 */25 * * * *') // Run every 25 minutes
+  @Cron('0 */20 * * * *') // Run every 25 minutes
   async handleCadenceExecution() {
     try {
       // Check Redis connection before proceeding
@@ -126,9 +126,11 @@ export class CadenceService {
         campaign.cadence_resume_day
       ) {
         const now = new Date();
-        const ageInHours =
+        const rawAgeInHours =
           (now.getTime() - campaign.cadence_resume_from_date.getTime()) /
           (1000 * 60 * 60);
+        // Subtract 5 hours for EST offset, minimum 0
+        const ageInHours = Math.max(0, rawAgeInHours - 5);
         const ageInDays = ageInHours / 24;
         ageDay = Math.floor(ageInDays) + campaign.cadence_resume_day;
 
@@ -142,15 +144,17 @@ export class CadenceService {
           `[RESUME-INFO] Campaign ${campaign.id}: Resume Day: ${ageDay}`,
         );
       } else {
-        // Use normal logic (time-based day calculation) - EXISTING CODE UNCHANGED
+        // Use normal logic (time-based day calculation) - UPDATED TO SUBTRACT 5 HOURS FOR EST
         const now = new Date();
-        const ageInHours =
+        const rawAgeInHours =
           (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60);
+        // Subtract 5 hours for EST offset, minimum 0
+        const ageInHours = Math.max(0, rawAgeInHours - 5);
         const ageInDays = ageInHours / 24;
         ageDay = Math.floor(ageInDays) + 1; // Convert to integer for day lookup
 
         this.logger.log(
-          `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay}`,
+          `[INFO] Campaign ${campaign.id}: Age = ${ageInDays.toFixed(2)} days (${ageInHours.toFixed(2)} hours), Day: ${ageDay} [EST-adjusted: -5hrs]`,
         );
       }
 
@@ -326,17 +330,19 @@ export class CadenceService {
         return;
       }
 
-      // Calculate age with hours precision
+      // Calculate age with hours precision - SUBTRACT 5 HOURS FOR EST
       const now = new Date();
-      const ageInHours =
+      const rawAgeInHours =
         (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
+      // Subtract 5 hours for EST offset, minimum 0
+      const ageInHours = Math.max(0, rawAgeInHours - 5);
       const ageInDays = ageInHours / 24;
       const age = Math.floor(ageInDays) + 1;
       // Convert to integer for day lookup, add 1 for 1-based indexing
       console.log(
         '[INFO] age (days since created):',
         age,
-        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours)`,
+        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours) [EST-adjusted: -5hrs]`,
       );
       console.log(
         '[INFO] Current time (EST):',
@@ -775,15 +781,17 @@ export class CadenceService {
       // 🔑 ONLY CHANGE: Calculate resume day based on progress instead of time
 
       const now = new Date();
-      const ageInHours =
+      const rawAgeInHours =
         (now.getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
+      // Subtract 5 hours for EST offset, minimum 0
+      const ageInHours = Math.max(0, rawAgeInHours - 5);
       const ageInDays = ageInHours / 24;
       const age = Math.floor(ageInDays) + (campaign?.cadence_resume_day || 0);
-      // Convert to integer for day lookup, add 1 for 1-based indexing
+      // Convert to integer for day lookup, add resume day offset
       console.log(
         '[INFO] age (days since created):',
         age,
-        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours)`,
+        `(${ageInDays.toFixed(2)} days, ${ageInHours.toFixed(2)} hours) [EST-adjusted: -5hrs]`,
       );
       console.log(
         '[INFO] Current time (EST):',
