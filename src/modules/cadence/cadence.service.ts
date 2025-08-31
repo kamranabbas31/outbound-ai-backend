@@ -284,6 +284,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -315,6 +319,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -351,6 +359,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -387,6 +399,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -458,6 +474,10 @@ export class CadenceService {
           data: { execution_status: 'idle' },
         });
         console.log('[DB] Campaign execution_status updated to "completed"');
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
       const cadenceProgressCount = await this.prisma.cadenceProgress.count({
@@ -499,6 +519,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -526,11 +550,8 @@ export class CadenceService {
             processedLeadIdsInThisCycle.add(lead.id);
           } catch (err) {
             if (err?.response?.status === 429) {
-              this.logger.warn(
-                `Rate limited by Vapi. Waiting 5s before retry...`,
-              );
-              await new Promise((res) => setTimeout(res, 5000));
-              await this.triggerCallService.triggerCall({ leadId: lead.id }); // retry once
+              this.logger.warn(`Rate limited by Vapi.`);
+              // retry once
             } else {
               throw err;
             }
@@ -545,11 +566,8 @@ export class CadenceService {
             processedLeadIdsInThisCycle.add(lead.id);
           } catch (err) {
             if (err?.response?.status === 429) {
-              this.logger.warn(
-                `Rate limited by Vapi. Waiting 5s before retry...`,
-              );
-              await new Promise((res) => setTimeout(res, 4000));
-              await this.triggerCallService.triggerCallForCadence(lead); // retry once
+              this.logger.warn(`Rate limited by Vapi.`);
+              // retry once
             } else {
               throw err;
             }
@@ -630,6 +648,10 @@ export class CadenceService {
           console.log(`  - Calls triggered: ${hasRetried ? 'Yes' : 'No'}`);
           console.log(`  - Progress recorded: Yes`);
           console.log(`  - Status: Campaign marked as completed`);
+          this.executingCampaigns.delete(campaignId);
+          console.log(
+            `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+          );
           return 'completed';
         }
       }
@@ -637,6 +659,10 @@ export class CadenceService {
         where: { id: campaignId },
         data: { execution_status: 'idle' },
       });
+      this.executingCampaigns.delete(campaignId);
+      console.log(
+        `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+      );
       console.log('[END] executeCampaignCadence completed.');
       console.log('[SUMMARY] Campaign cadence execution summary:');
       console.log(`  - Campaign ID: ${campaignId}`);
@@ -651,6 +677,10 @@ export class CadenceService {
         where: { id: campaignId },
         data: { execution_status: 'idle' },
       });
+      this.executingCampaigns.delete(campaignId);
+      console.log(
+        `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+      );
       console.error('[ERROR] executeCampaignCadence failed:', error);
       console.log('[SUMMARY] Campaign cadence execution summary:');
       console.log(`  - Campaign ID: ${campaignId}`);
@@ -708,6 +738,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -731,6 +765,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -758,6 +796,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return 'completed';
       }
 
@@ -772,6 +814,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -794,6 +840,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -857,6 +907,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -889,6 +943,10 @@ export class CadenceService {
           where: { id: campaignId },
           data: { execution_status: 'idle' },
         });
+        this.executingCampaigns.delete(campaignId);
+        console.log(
+          `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+        );
         return;
       }
 
@@ -988,9 +1046,17 @@ export class CadenceService {
             data: { cadence_completed: true, execution_status: 'idle' },
           });
           console.log('[DB] Campaign marked completed:', updatedCampaign);
+          this.executingCampaigns.delete(campaignId);
+          console.log(
+            `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+          );
           return 'completed';
         }
       }
+      this.executingCampaigns.delete(campaignId);
+      console.log(
+        `[CLEANUP] Removed campaign ${campaignId} from executing set`,
+      );
       await this.prisma.campaigns.update({
         where: { id: campaignId },
         data: { execution_status: 'idle' },
