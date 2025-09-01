@@ -1329,20 +1329,24 @@ export class CadenceService {
         hours = 0;
       }
 
-      // Create a new date object and set the time in EST
-      // baseDate is in UTC, but we want to set EST time on it
+      // Create a new date object with the base date
       const result = new Date(baseDate);
-      result.setHours(hours, minutes, 0, 0);
-
-      // Convert EDT to UTC by adding 4 hours (EDT is UTC-4 in summer)
-      // Note: EST is UTC-5 in winter, EDT is UTC-4 in summer
-      const edtToUtcOffset = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
-      const utcResult = new Date(result.getTime() + edtToUtcOffset);
+      
+      // Set the time as EDT and convert to UTC
+      // EDT is UTC-4, so to get UTC time we need to add 4 hours to EDT time
+      // We directly set UTC hours by adding 4 to the EDT hours
+      result.setUTCHours(hours + 4, minutes, 0, 0);
+      
+      // If adding 4 hours causes the time to go to next day, we need to subtract a day
+      // to keep it on the same base date
+      if (hours + 4 >= 24) {
+        result.setUTCDate(result.getUTCDate() - 1);
+      }
 
       console.log(
-        `Parsed time: "${timeStr}" -> EDT: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" EDT -> UTC: ${result.toISOString()}`,
       );
-      return utcResult;
+      return result;
     }
 
     // Handle 24-hour format (e.g., "14:00", "02:30")
@@ -1351,20 +1355,24 @@ export class CadenceService {
       const hours = parseInt(timeMatch24[1], 10);
       const minutes = parseInt(timeMatch24[2], 10);
 
-      // Create a new date object and set the time in EST
-      // baseDate is in UTC, but we want to set EST time on it
+      // Create a new date object with the base date
       const result = new Date(baseDate);
-      result.setHours(hours, minutes, 0, 0);
-
-      // Convert EDT to UTC by adding 4 hours (EDT is UTC-4 in summer)
-      // Note: EST is UTC-5 in winter, EDT is UTC-4 in summer
-      const edtToUtcOffset = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
-      const utcResult = new Date(result.getTime() + edtToUtcOffset);
+      
+      // Set the time as EDT and convert to UTC
+      // EDT is UTC-4, so to get UTC time we need to add 4 hours to EDT time
+      // We directly set UTC hours by adding 4 to the EDT hours
+      result.setUTCHours(hours + 4, minutes, 0, 0);
+      
+      // If adding 4 hours causes the time to go to next day, we need to subtract a day
+      // to keep it on the same base date
+      if (hours + 4 >= 24) {
+        result.setUTCDate(result.getUTCDate() - 1);
+      }
 
       console.log(
-        `Parsed time: "${timeStr}" -> EDT: ${result.toISOString()} -> UTC: ${utcResult.toISOString()}`,
+        `Parsed time: "${timeStr}" EDT -> UTC: ${result.toISOString()}`,
       );
-      return utcResult;
+      return result;
     }
 
     // If parsing fails, return the base date
